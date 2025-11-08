@@ -134,6 +134,11 @@ class _ChurchAddScreenState extends State<ChurchAddScreen> {
                 _imagePickerWidget(
                   title: 'شعار الكنيسة',
                   imageFile: _churchLogo,
+                  onRemove: () {
+                    setState(() {
+                      _churchLogo = null;
+                    });
+                  },
                   onTap: () async {
                     final img = await _pickImage(true);
                     if (img != null) setState(() => _churchLogo = img);
@@ -142,6 +147,11 @@ class _ChurchAddScreenState extends State<ChurchAddScreen> {
                 const SizedBox(height: 20),
                 _imagePickerWidget(
                   title: 'شعار المطرانية',
+                  onRemove: () {
+                    setState(() {
+                      _dioceseLogo = null;
+                    });
+                  },
                   imageFile: _dioceseLogo,
                   onTap: () async {
                     final img = await _pickImage(false);
@@ -202,6 +212,7 @@ class _ChurchAddScreenState extends State<ChurchAddScreen> {
     required String title,
     required File? imageFile,
     required VoidCallback onTap,
+    VoidCallback? onRemove,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,9 +243,33 @@ class _ChurchAddScreenState extends State<ChurchAddScreen> {
                       color: AppColors.accent,
                     ),
                   )
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.file(imageFile, fit: BoxFit.cover),
+                : Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(imageFile, fit: BoxFit.cover),
+                      ),
+                      if (onRemove != null)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: GestureDetector(
+                            onTap: onRemove,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
           ),
         ),

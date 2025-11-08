@@ -156,7 +156,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
               padding: pw.EdgeInsets.all(16),
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   // Left side (Church)
                   pw.Column(
@@ -394,8 +394,35 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
             FloatingActionButton(
               heroTag: "print",
               onPressed: () async {
-                final firstChurch = await DatabaseHelper().getAllChurches();
-                generateIndividualsPdf(_filteredIndividuals, firstChurch.first);
+                try {
+                  final firstChurch = await DatabaseHelper().getAllChurches();
+                  await generateIndividualsPdf(
+                    _filteredIndividuals,
+                    firstChurch.first,
+                  );
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'تم إنشاء التقرير بنجاح',
+                        style: GoogleFonts.cairo(),
+                      ),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'فشل في إنشاء التقرير',
+                        style: GoogleFonts.cairo(),
+                      ),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
               },
               backgroundColor: AppColors.light,
               child: Icon(Icons.print, color: AppColors.primary),

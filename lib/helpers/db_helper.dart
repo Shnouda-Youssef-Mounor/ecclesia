@@ -338,6 +338,7 @@ class DatabaseHelper {
 
   Future<int> updateChurch(int id, Map<String, dynamic> church) async {
     final db = await database;
+    print(church);
     return await db.update(
       'churches',
       church,

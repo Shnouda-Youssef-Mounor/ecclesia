@@ -83,67 +83,92 @@ class _ViewChurchScreenState extends State<ViewChurchScreen>
                 },
               )
             : null,
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _churches.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.church_outlined,
-                      size: 90,
-                      color: AppColors.light,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'لا توجد كنائس بعد',
-                      style: GoogleFonts.cairo(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.secondary,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth > 800;
-                  final crossAxisCount = isWide ? 3 : 1;
-
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _churches.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: isWide ? 1.3 : 1.1,
-                    ),
-                    itemBuilder: (context, index) {
-                      final church = _churches[index];
-                      final animation = Tween<double>(begin: 0, end: 1).animate(
-                        CurvedAnimation(
-                          parent: _animationController,
-                          curve: Interval(
-                            (index / _churches.length),
-                            1.0,
-                            curve: Curves.easeOut,
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _churches.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.church_outlined,
+                            size: 90,
+                            color: AppColors.light,
                           ),
-                        ),
-                      );
-                      return FadeTransition(
-                        opacity: animation,
-                        child: Transform.translate(
-                          offset: Offset(0, 20 * (1 - animation.value)),
-                          child: _buildChurchCard(church),
-                        ),
-                      );
-                    },
-                  );
-                },
+                          const SizedBox(height: 20),
+                          Text(
+                            'لا توجد كنائس بعد',
+                            style: GoogleFonts.cairo(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth > 800;
+                        final crossAxisCount = isWide ? 2 : 1;
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _churches.length,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                                childAspectRatio: isWide ? 1.3 : 1.1,
+                              ),
+                          itemBuilder: (context, index) {
+                            final church = _churches[index];
+                            final animation = Tween<double>(begin: 0, end: 1)
+                                .animate(
+                                  CurvedAnimation(
+                                    parent: _animationController,
+                                    curve: Interval(
+                                      (index / _churches.length),
+                                      1.0,
+                                      curve: Curves.easeOut,
+                                    ),
+                                  ),
+                                );
+                            return FadeTransition(
+                              opacity: animation,
+                              child: Transform.translate(
+                                offset: Offset(0, 20 * (1 - animation.value)),
+                                child: _buildChurchCard(church),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+              const SizedBox(height: 20),
+              Padding(
+                padding: EdgeInsetsGeometry.all( 8),
+                child: Center(
+                  child: Text(
+                    textAlign: TextAlign.center,
+                    'تُستخدم هذه البيانات في إعداد التقارير، ويُسمح فقط للمدير بإضافة أو تعديل البيانات غير الموجودة مسبقًا.',
+                    style: GoogleFonts.cairo(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blueGrey[700],
+                      height: 1.5,
+                    ),
+                  ),
+                ),
               ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -251,7 +276,9 @@ class _ViewChurchScreenState extends State<ViewChurchScreen>
                               builder: (context) =>
                                   ChurchAddScreen(item: church),
                             ),
-                          );
+                          ).then((value) {
+                            _loadChurches();
+                          });
                         },
                       ),
                     ],
