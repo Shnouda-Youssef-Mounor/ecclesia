@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/enhanced_data_table.dart';
 import '../../helpers/db_helper.dart';
 import '../../services/auth_service.dart';
 import 'family_details_screen.dart';
@@ -53,11 +54,15 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
     setState(() {
       _filteredFamilies = _families.where((family) {
         final name = family['family_name']?.toString().toLowerCase() ?? '';
-        final address = family['family_address']?.toString().toLowerCase() ?? '';
+        final address =
+            family['family_address']?.toString().toLowerCase() ?? '';
         final searchTerm = _searchController.text.toLowerCase();
 
-        final matchesSearch = name.contains(searchTerm) || address.contains(searchTerm);
-        final matchesArea = _selectedArea == 'الكل' || family['area_id']?.toString() == _selectedArea;
+        final matchesSearch =
+            name.contains(searchTerm) || address.contains(searchTerm);
+        final matchesArea =
+            _selectedArea == 'الكل' ||
+            family['area_id']?.toString() == _selectedArea;
 
         return matchesSearch && matchesArea;
       }).toList();
@@ -72,7 +77,7 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
-    
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -113,8 +118,8 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
                             ),
                           )
                         : isDesktop
-                            ? _buildDesktopView()
-                            : _buildMobileView(),
+                        ? _buildDesktopView()
+                        : _buildMobileView(),
                   ),
                 ],
               ),
@@ -125,52 +130,51 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
   Widget _buildDesktopView() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Card(
-        child: DataTable(
-          columns: [
-            DataColumn(label: Text('اسم الأسرة', style: GoogleFonts.cairo(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('العنوان', style: GoogleFonts.cairo(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('الإجراءات', style: GoogleFonts.cairo(fontWeight: FontWeight.bold))),
-          ],
-          rows: _filteredFamilies.map((family) {
-            return DataRow(cells: [
-              DataCell(Text(family['family_name'] ?? '', style: GoogleFonts.cairo())),
-              DataCell(Text(family['family_address'] ?? '', style: GoogleFonts.cairo())),
-              DataCell(Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.visibility, color: AppColors.primary),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => FamilyDetailsScreen(family: family),
-                      ),
+      child: EnhancedDataTable(
+        headers: const ['اسم الأسرة', 'العنوان'],
+        rows: _filteredFamilies
+            .map(
+              (family) => [
+                (family['family_name'] ?? '').toString(),
+                (family['family_address'] ?? '').toString(),
+              ],
+            )
+            .toList(),
+        actions: _filteredFamilies
+            .map(
+              (family) => [
+                _buildActionButton(
+                  Icons.visibility,
+                  AppColors.primary,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FamilyDetailsScreen(family: family),
                     ),
                   ),
-                  if (AuthService.canEdit()) ...[
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: AppColors.secondary),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddEditFamilyScreen(family: family),
-                          ),
-                        );
-                        _loadFamilies();
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _showDeleteDialog(family['id']),
-                    ),
-                  ],
+                ),
+                if (AuthService.canEdit()) ...[
+                  const SizedBox(width: 4),
+                  _buildActionButton(Icons.edit, AppColors.secondary, () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            AddEditFamilyScreen(family: family),
+                      ),
+                    );
+                    _loadFamilies();
+                  }),
+                  const SizedBox(width: 4),
+                  _buildActionButton(
+                    Icons.delete,
+                    Colors.red,
+                    () => _showDeleteDialog(family['id']),
+                  ),
                 ],
-              )),
-            ]);
-          }).toList(),
-        ),
+              ],
+            )
+            .toList(),
       ),
     );
   }
@@ -222,7 +226,10 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
                       children: [
                         const Icon(Icons.delete, color: Colors.red),
                         const SizedBox(width: 8),
-                        Text('حذف', style: GoogleFonts.cairo(color: Colors.red)),
+                        Text(
+                          'حذف',
+                          style: GoogleFonts.cairo(color: Colors.red),
+                        ),
                       ],
                     ),
                   ),
@@ -234,7 +241,8 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => FamilyDetailsScreen(family: family),
+                        builder: (context) =>
+                            FamilyDetailsScreen(family: family),
                       ),
                     );
                     break;
@@ -242,7 +250,8 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AddEditFamilyScreen(family: family),
+                        builder: (context) =>
+                            AddEditFamilyScreen(family: family),
                       ),
                     );
                     _loadFamilies();
@@ -266,7 +275,10 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text('تأكيد الحذف', style: GoogleFonts.cairo()),
-          content: Text('هل أنت متأكد من حذف هذه الأسرة؟', style: GoogleFonts.cairo()),
+          content: Text(
+            'هل أنت متأكد من حذف هذه الأسرة؟',
+            style: GoogleFonts.cairo(),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -377,7 +389,7 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
     for (var area in _areas) {
       areaOptions.add(area['id'].toString());
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -393,7 +405,10 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
           items: areaOptions.map((areaId) {
             String displayName = 'الكل';
             if (areaId != 'الكل') {
-              final area = _areas.firstWhere((a) => a['id'].toString() == areaId, orElse: () => {});
+              final area = _areas.firstWhere(
+                (a) => a['id'].toString() == areaId,
+                orElse: () => {},
+              );
               displayName = area['area_name'] ?? 'غير محدد';
             }
             return DropdownMenuItem(
@@ -406,6 +421,25 @@ class _FamiliesScreenState extends State<FamiliesScreen> {
             _filterFamilies();
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    IconData icon,
+    Color color,
+    VoidCallback onPressed,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: color, size: 16),
+        onPressed: onPressed,
+        padding: const EdgeInsets.all(6),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/searchable_dropdown.dart';
 import '../../helpers/db_helper.dart';
 
 class AddEditFamilyScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
   int? _fatherId;
   int? _motherId;
   int? _selectedAreaId;
+  List<int> _selectedMembers = [];
   List<Map<String, dynamic>> _individuals = [];
   List<Map<String, dynamic>> _areas = [];
   bool _isLoading = false;
@@ -32,6 +34,7 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
     _loadData();
     if (widget.family != null) {
       _loadFamilyData();
+      _loadFamilyMembers();
     }
   }
 
@@ -39,6 +42,19 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
     _individuals = await _db.getAllIndividuals();
     _areas = await _db.getAllAreas();
     setState(() {});
+  }
+
+  Future<void> _loadFamilyMembers() async {
+    if (widget.family != null) {
+      try {
+        final members = await _db.getFamilyMembers(widget.family!['id']);
+        setState(() {
+          _selectedMembers = members.map<int>((m) => m['id'] as int).toList();
+        });
+      } catch (e) {
+        print('خطأ في تحميل أعضاء الأسرة: $e');
+      }
+    }
   }
 
 
@@ -66,11 +82,33 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
     };
 
     try {
+      int familyId;
       if (widget.family == null) {
-        await _db.insertFamily(data);
+        familyId = await _db.insertFamily(data);
       } else {
-        await _db.updateFamily(widget.family!['id'], data);
+        familyId = widget.family!['id'];
+        await _db.updateFamily(familyId, data);
+        
+        // حذف الأعضاء الحاليين
+        final currentMembers = await _db.getFamilyMembers(familyId);
+        for (final member in currentMembers) {
+          await _db.removeFamilyMember(familyId, member['id']);
+        }
       }
+
+      // إضافة الأب والأم كأعضاء في الأسرة
+      if (_fatherId != null) {
+        await _db.addFamilyMember(familyId, _fatherId!);
+      }
+      if (_motherId != null) {
+        await _db.addFamilyMember(familyId, _motherId!);
+      }
+      
+      // إضافة باقي الأعضاء
+      for (final memberId in _selectedMembers) {
+        await _db.addFamilyMember(familyId, memberId);
+      }
+
       Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -109,21 +147,34 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
                     const SizedBox(height: 16),
                     _buildTextField(_addressController, 'عنوان الأسرة'),
                     const SizedBox(height: 16),
-                    _buildAreaDropdown(),
-                    const SizedBox(height: 16),
-                    _buildDropdown(
-                      'الأب',
-                      _fatherId,
-                      _individuals.where((i) => i['gender'] == 'ذكر').toList(),
-                      (value) => setState(() => _fatherId = value),
+                    SearchableDropdown<int>(
+                      label: 'المنطقة',
+                      value: _selectedAreaId,
+                      items: _areas,
+                      displayKey: 'area_name',
+                      valueKey: 'id',
+                      onChanged: (value) => setState(() => _selectedAreaId = value),
                     ),
                     const SizedBox(height: 16),
-                    _buildDropdown(
-                      'الأم',
-                      _motherId,
-                      _individuals.where((i) => i['gender'] == 'أنثى').toList(),
-                      (value) => setState(() => _motherId = value),
+                    SearchableDropdown<int>(
+                      label: 'الأب',
+                      value: _fatherId,
+                      items: _individuals.where((i) => i['gender'] == 'ذكر').toList(),
+                      displayKey: 'full_name',
+                      valueKey: 'id',
+                      onChanged: (value) => setState(() => _fatherId = value),
                     ),
+                    const SizedBox(height: 16),
+                    SearchableDropdown<int>(
+                      label: 'الأم',
+                      value: _motherId,
+                      items: _individuals.where((i) => i['gender'] == 'أنثى').toList(),
+                      displayKey: 'full_name',
+                      valueKey: 'id',
+                      onChanged: (value) => setState(() => _motherId = value),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildMembersSection(),
                     const SizedBox(height: 32),
                     SizedBox(
                       width: double.infinity,
@@ -206,6 +257,67 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
         )),
       ],
       onChanged: (value) => setState(() => _selectedAreaId = value),
+    );
+  }
+
+  Widget _buildMembersSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'أعضاء الأسرة',
+          style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 200,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: _individuals.isEmpty
+              ? Center(
+                  child: Text(
+                    'لا توجد أفراد متاحين',
+                    style: GoogleFonts.cairo(color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _individuals.length,
+                  itemBuilder: (context, index) {
+                    final individual = _individuals[index];
+                    final individualId = individual['id'];
+                    
+                    // استثناء الأب والأم من قائمة الأعضاء
+                    if (individualId == _fatherId || individualId == _motherId) {
+                      return const SizedBox.shrink();
+                    }
+                    
+                    final isSelected = _selectedMembers.contains(individualId);
+                    return CheckboxListTile(
+                      title: Text(
+                        individual['full_name'] ?? '',
+                        style: GoogleFonts.cairo(),
+                      ),
+                      subtitle: Text(
+                        individual['national_id'] ?? '',
+                        style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                      ),
+                      value: isSelected,
+                      onChanged: (value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedMembers.add(individualId);
+                          } else {
+                            _selectedMembers.remove(individualId);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

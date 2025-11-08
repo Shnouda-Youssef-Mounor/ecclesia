@@ -1,10 +1,19 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../utils/app_colors.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+
 import '../../helpers/db_helper.dart';
 import '../../services/auth_service.dart';
-import 'individual_details_screen.dart';
+import '../../utils/app_colors.dart';
+import '../../utils/enhanced_data_table.dart';
 import 'add_edit_individual_screen.dart';
+import 'individual_details_screen.dart';
 
 class IndividualsScreen extends StatefulWidget {
   const IndividualsScreen({super.key});
@@ -18,10 +27,14 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
   List<Map<String, dynamic>> _individuals = [];
   List<Map<String, dynamic>> _filteredIndividuals = [];
   List<Map<String, dynamic>> _areas = [];
+  List<Map<String, dynamic>> _educationStages = [];
+  List<Map<String, dynamic>> _sectors = [];
   final TextEditingController _searchController = TextEditingController();
   String _selectedGender = 'الكل';
   String _selectedMaritalStatus = 'الكل';
   String _selectedArea = 'الكل';
+  String _selectedEducationStage = 'الكل';
+  String _selectedSector = 'الكل';
   bool _isLoading = true;
 
   @override
@@ -34,6 +47,8 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     _areas = await _db.getAllAreas();
+    _educationStages = await _db.getAllEducationStages();
+    _sectors = await _db.getAllSectors();
     _individuals = await _db.getAllIndividuals();
     _filteredIndividuals = _individuals;
     setState(() => _isLoading = false);
@@ -72,10 +87,25 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
             _selectedMaritalStatus == 'الكل' ||
             individual['marital_status'] == _selectedMaritalStatus;
 
-        final matchesArea = _selectedArea == 'الكل' || 
+        final matchesArea =
+            _selectedArea == 'الكل' ||
             individual['area_id']?.toString() == _selectedArea;
 
-        return matchesSearch && matchesGender && matchesMarital && matchesArea;
+        final matchesEducationStage =
+            _selectedEducationStage == 'الكل' ||
+            individual['education_stage_id']?.toString() ==
+                _selectedEducationStage;
+
+        final matchesSector = _selectedSector == 'الكل';
+        // للقطاع نحتاج للتحقق من جدول individual_sectors
+        // مؤقتاً سنعتبره مطابق إذا لم يتم اختيار قطاع
+
+        return matchesSearch &&
+            matchesGender &&
+            matchesMarital &&
+            matchesArea &&
+            matchesEducationStage &&
+            matchesSector;
       }).toList();
     });
   }
@@ -85,12 +115,253 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
     _loadIndividuals();
   }
 
+  Future<String> generateIndividualsPdf(
+    List<Map<String, dynamic>> individuals,
+    Map<String, dynamic> firstChurch,
+  ) async {
+    final fontData = await rootBundle.load(
+      "assets/fonts/NotoNaskhArabic-VariableFont.ttf",
+    );
+    final fontBoldData = await rootBundle.load(
+      "assets/fonts/NotoNaskhArabic-Bold.ttf",
+    );
+    final ttf = pw.Font.ttf(fontData);
+    final ttfBold = pw.Font.ttf(fontBoldData);
+
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        textDirection: pw.TextDirection.rtl,
+        margin: pw.EdgeInsets.all(40),
+        footer: (pw.Context context) {
+          return pw.Container(
+            alignment: pw.Alignment.center,
+            margin: const pw.EdgeInsets.only(top: 10),
+            child: pw.Text(
+              'الصفحة ${context.pageNumber} من ${context.pagesCount}',
+              style: pw.TextStyle(
+                font: ttf,
+                fontSize: 10,
+                color: PdfColors.grey700,
+              ),
+            ),
+          );
+        },
+        build: (context) {
+          return [
+            // ======= Header =======
+            pw.Container(
+              padding: pw.EdgeInsets.all(16),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  // Left side (Church)
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      if (firstChurch['church_logo'] != null &&
+                          (firstChurch['church_logo'] as String).isNotEmpty &&
+                          File(firstChurch['church_logo']).existsSync())
+                        pw.Container(
+                          width: 60,
+                          height: 60,
+                          child: pw.Image(
+                            pw.MemoryImage(
+                              File(
+                                firstChurch['church_logo'],
+                              ).readAsBytesSync(),
+                            ),
+                            fit: pw.BoxFit.cover,
+                          ),
+                        ),
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        firstChurch['church_name'] ?? '',
+                        style: pw.TextStyle(
+                          font: ttfBold,
+                          fontSize: 12,
+                          color: PdfColors.black,
+                        ),
+                      ),
+                      pw.Text(
+                        firstChurch['church_country'] ?? '',
+                        style: pw.TextStyle(
+                          font: ttf,
+                          fontSize: 10,
+                          color: PdfColors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Right side (Diocese)
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      if (firstChurch['diocese_logo'] != null &&
+                          (firstChurch['diocese_logo'] as String).isNotEmpty &&
+                          File(firstChurch['diocese_logo']).existsSync())
+                        pw.Container(
+                          width: 60,
+                          height: 60,
+                          child: pw.Image(
+                            pw.MemoryImage(
+                              File(
+                                firstChurch['diocese_logo'],
+                              ).readAsBytesSync(),
+                            ),
+                            fit: pw.BoxFit.cover,
+                          ),
+                        ),
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        firstChurch['diocese_name'] ?? '',
+                        style: pw.TextStyle(
+                          font: ttfBold,
+                          fontSize: 12,
+                          color: PdfColors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            pw.SizedBox(height: 25),
+
+            // ======= Title =======
+            pw.Center(
+              child: pw.Text(
+                'قائمة الأفراد',
+                style: pw.TextStyle(
+                  font: ttfBold,
+                  fontSize: 16,
+                  color: PdfColors.indigo900,
+                ),
+              ),
+            ),
+
+            pw.SizedBox(height: 20),
+
+            // ======= Individuals Table =======
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              columnWidths: {
+                0: pw.FlexColumnWidth(2),
+                1: pw.FlexColumnWidth(2),
+                2: pw.FlexColumnWidth(2),
+                3: pw.FlexColumnWidth(2),
+                4: pw.FlexColumnWidth(1),
+              },
+              children: [
+                // Header row
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: PdfColors.indigo700),
+                  children:
+                      [
+                            'م',
+                            'الاسم الكامل',
+                            'الرقم القومي',
+                            'المحافظة',
+                            'تاريخ الميلاد',
+                          ]
+                          .map(
+                            (h) => pw.Padding(
+                              padding: pw.EdgeInsets.all(8),
+                              child: pw.Text(
+                                h,
+                                textAlign: pw.TextAlign.center,
+                                style: pw.TextStyle(
+                                  font: ttfBold,
+                                  fontSize: 10,
+                                  color: PdfColors.white,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList()
+                          .reversed
+                          .toList(),
+                ),
+
+                // Data rows
+                ...individuals.asMap().entries.map((entry) {
+                  final index = entry.key + 1;
+                  final person = entry.value;
+                  final isEven = index % 2 == 0;
+
+                  return pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                      color: isEven ? PdfColors.grey100 : PdfColors.white,
+                    ),
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          '$index',
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(font: ttf, fontSize: 9),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          person['full_name'] ?? '',
+                          style: pw.TextStyle(font: ttf, fontSize: 9),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          person['national_id'] ?? '',
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(font: ttf, fontSize: 9),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          person['governorate'] ?? '',
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(font: ttf, fontSize: 9),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          person['birth_date'] ?? '',
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(font: ttf, fontSize: 9),
+                        ),
+                      ),
+                    ].reversed.toList(), // ← هنا العكس للصف
+                  );
+                }),
+              ],
+            ),
+          ];
+        },
+      ),
+    );
+
+    final outputDir = await getApplicationDocumentsDirectory();
+    final churchName = firstChurch['church_name'] ?? 'church';
+    final filePath = '${outputDir.path}/${churchName}_individuals.pdf';
+    final file = File(filePath);
+    await file.writeAsBytes(await pdf.save());
+    return filePath;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
           title: Text(
@@ -100,8 +371,13 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
-        floatingActionButton: AuthService.canEdit()
-            ? FloatingActionButton(
+        floatingActionButton: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (AuthService.canEdit())
+              FloatingActionButton(
+                heroTag: "add",
                 onPressed: () async {
                   await Navigator.push(
                     context,
@@ -113,8 +389,19 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                 },
                 backgroundColor: AppColors.primary,
                 child: const Icon(Icons.add, color: Colors.white),
-              )
-            : null,
+              ),
+            const SizedBox(height: 16),
+            FloatingActionButton(
+              heroTag: "print",
+              onPressed: () async {
+                final firstChurch = await DatabaseHelper().getAllChurches();
+                generateIndividualsPdf(_filteredIndividuals, firstChurch.first);
+              },
+              backgroundColor: AppColors.light,
+              child: Icon(Icons.print, color: AppColors.primary),
+            ),
+          ],
+        ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : Column(
@@ -155,108 +442,54 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
   Widget _buildDesktopView() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Card(
-        child: DataTable(
-          columns: [
-            DataColumn(
-              label: Text(
-                'الاسم',
-                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'الرقم القومي',
-                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'الهاتف',
-                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'المنطقة',
-                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'الإجراءات',
-                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-          rows: _filteredIndividuals.map((individual) {
-            return DataRow(
-              cells: [
-                DataCell(
-                  Text(
-                    individual['full_name'] ?? '',
-                    style: GoogleFonts.cairo(),
-                  ),
-                ),
-                DataCell(
-                  Text(
-                    individual['national_id'] ?? '',
-                    style: GoogleFonts.cairo(),
-                  ),
-                ),
-                DataCell(
-                  Text(individual['phone'] ?? '', style: GoogleFonts.cairo()),
-                ),
-                DataCell(
-                  Text(individual['area'] ?? '', style: GoogleFonts.cairo()),
-                ),
-                DataCell(
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.visibility,
-                          color: AppColors.primary,
-                        ),
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                IndividualDetailsScreen(individual: individual),
-                          ),
-                        ),
-                      ),
-                      if (AuthService.canEdit()) ...[
-                        IconButton(
-                          icon: const Icon(
-                            Icons.edit,
-                            color: AppColors.secondary,
-                          ),
-                          onPressed: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AddEditIndividualScreen(
-                                  individual: individual,
-                                ),
-                              ),
-                            );
-                            _loadIndividuals();
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _showDeleteDialog(individual['id']),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+      child: EnhancedDataTable(
+        headers: const ['الاسم', 'الرقم القومي', 'الهاتف', 'المنطقة'],
+        rows: _filteredIndividuals
+            .map(
+              (individual) => <String>[
+                individual['full_name']?.toString() ?? '',
+                individual['national_id']?.toString() ?? '',
+                individual['phone']?.toString() ?? '',
+                individual['area']?.toString() ?? '',
               ],
-            );
-          }).toList(),
-        ),
+            )
+            .toList(),
+        actions: _filteredIndividuals
+            .map(
+              (individual) => [
+                _buildActionButton(
+                  Icons.visibility,
+                  AppColors.primary,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          IndividualDetailsScreen(individual: individual),
+                    ),
+                  ),
+                ),
+                if (AuthService.canEdit()) ...[
+                  const SizedBox(width: 4),
+                  _buildActionButton(Icons.edit, AppColors.secondary, () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            AddEditIndividualScreen(individual: individual),
+                      ),
+                    );
+                    _loadIndividuals();
+                  }),
+                  const SizedBox(width: 4),
+                  _buildActionButton(
+                    Icons.delete,
+                    Colors.red,
+                    () => _showDeleteDialog(individual['id']),
+                  ),
+                ],
+              ],
+            )
+            .toList(),
       ),
     );
   }
@@ -475,7 +708,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
     showDialog(
       context: context,
       builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: ui.TextDirection.rtl,
         child: AlertDialog(
           title: Text('تأكيد الحذف', style: GoogleFonts.cairo()),
           content: Text(
@@ -552,33 +785,116 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildFilterDropdown(
-                  'النوع',
-                  _selectedGender,
-                  ['الكل', 'ذكر', 'أنثى'],
-                  (value) {
-                    setState(() => _selectedGender = value!);
-                    _filterIndividuals();
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'النوع:',
+                      style: GoogleFonts.cairo(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _buildFilterDropdown(
+                      'النوع',
+                      _selectedGender,
+                      ['الكل', 'ذكر', 'أنثى'],
+                      (value) {
+                        setState(() => _selectedGender = value!);
+                        _filterIndividuals();
+                      },
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildFilterDropdown(
-                  'الحالة الاجتماعية',
-                  _selectedMaritalStatus,
-                  ['الكل', 'أعزب', 'متزوج', 'مطلق', 'أرمل'],
-                  (value) {
-                    setState(() => _selectedMaritalStatus = value!);
-                    _filterIndividuals();
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'الحالة الاجتماعية:',
+                      style: GoogleFonts.cairo(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _buildFilterDropdown(
+                      'الحالة الاجتماعية',
+                      _selectedMaritalStatus,
+                      ['الكل', 'أعزب', 'متزوج', 'مطلق', 'أرمل'],
+                      (value) {
+                        setState(() => _selectedMaritalStatus = value!);
+                        _filterIndividuals();
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
           // فلتر المناطق
-          _buildAreaFilterDropdown(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'المنطقة:',
+                style: GoogleFonts.cairo(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.secondary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              _buildAreaFilterDropdown(),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // فلاتر المرحلة التعليمية والقطاع
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'المرحلة التعليمية:',
+                      style: GoogleFonts.cairo(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _buildEducationStageFilterDropdown(),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'القطاع:',
+                      style: GoogleFonts.cairo(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _buildSectorFilterDropdown(),
+                  ],
+                ),
+              ),
+            ],
+          ),
           // عداد النتائج
           const SizedBox(height: 8),
           Row(
@@ -595,7 +911,9 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
               if (_searchController.text.isNotEmpty ||
                   _selectedGender != 'الكل' ||
                   _selectedMaritalStatus != 'الكل' ||
-                  _selectedArea != 'الكل')
+                  _selectedArea != 'الكل' ||
+                  _selectedEducationStage != 'الكل' ||
+                  _selectedSector != 'الكل')
                 TextButton.icon(
                   onPressed: () {
                     _searchController.clear();
@@ -603,6 +921,8 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                       _selectedGender = 'الكل';
                       _selectedMaritalStatus = 'الكل';
                       _selectedArea = 'الكل';
+                      _selectedEducationStage = 'الكل';
+                      _selectedSector = 'الكل';
                     });
                     _filterIndividuals();
                   },
@@ -686,13 +1006,13 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
     return Container(
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: IconButton(
-        icon: Icon(icon, color: color, size: 20),
+        icon: Icon(icon, color: color, size: 16),
         onPressed: onPressed,
-        padding: const EdgeInsets.all(8),
-        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        padding: const EdgeInsets.all(6),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       ),
     );
   }
@@ -702,7 +1022,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
     for (var area in _areas) {
       areaOptions.add(area['id'].toString());
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -718,7 +1038,10 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
           items: areaOptions.map((areaId) {
             String displayName = 'الكل';
             if (areaId != 'الكل') {
-              final area = _areas.firstWhere((a) => a['id'].toString() == areaId, orElse: () => {});
+              final area = _areas.firstWhere(
+                (a) => a['id'].toString() == areaId,
+                orElse: () => {},
+              );
               displayName = area['area_name'] ?? 'غير محدد';
             }
             return DropdownMenuItem(
@@ -728,6 +1051,91 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
           }).toList(),
           onChanged: (value) {
             setState(() => _selectedArea = value!);
+            _filterIndividuals();
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEducationStageFilterDropdown() {
+    List<String> stageOptions = ['الكل'];
+    for (var stage in _educationStages) {
+      stageOptions.add(stage['id'].toString());
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedEducationStage,
+          isExpanded: true,
+          hint: Text(
+            'المرحلة التعليمية',
+            style: GoogleFonts.cairo(fontSize: 14),
+          ),
+          items: stageOptions.map((stageId) {
+            String displayName = 'الكل';
+            if (stageId != 'الكل') {
+              final stage = _educationStages.firstWhere(
+                (s) => s['id'].toString() == stageId,
+                orElse: () => {},
+              );
+              displayName = stage['stage_name'] ?? 'غير محدد';
+            }
+            return DropdownMenuItem(
+              value: stageId,
+              child: Text(displayName, style: GoogleFonts.cairo(fontSize: 14)),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() => _selectedEducationStage = value!);
+            _filterIndividuals();
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectorFilterDropdown() {
+    List<String> sectorOptions = ['الكل'];
+    for (var sector in _sectors) {
+      sectorOptions.add(sector['id'].toString());
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedSector,
+          isExpanded: true,
+          hint: Text('القطاع', style: GoogleFonts.cairo(fontSize: 14)),
+          items: sectorOptions.map((sectorId) {
+            String displayName = 'الكل';
+            if (sectorId != 'الكل') {
+              final sector = _sectors.firstWhere(
+                (s) => s['id'].toString() == sectorId,
+                orElse: () => {},
+              );
+              displayName = sector['sector_name'] ?? 'غير محدد';
+            }
+            return DropdownMenuItem(
+              value: sectorId,
+              child: Text(displayName, style: GoogleFonts.cairo(fontSize: 14)),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() => _selectedSector = value!);
             _filterIndividuals();
           },
         ),

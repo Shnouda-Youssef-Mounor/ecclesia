@@ -45,11 +45,8 @@ class _FamilyDetailsScreenState extends State<FamilyDetailsScreen> {
       );
     }
 
-    // تحميل أعضاء الأسرة
-    final allIndividuals = await _db.getAllIndividuals();
-    _members = allIndividuals.where((individual) => 
-      individual['family_name'] == widget.family['family_name']
-    ).toList();
+    // تحميل أعضاء الأسرة من جدول family_members
+    _members = await _db.getFamilyMembers(widget.family['id']);
 
     setState(() => _isLoading = false);
   }

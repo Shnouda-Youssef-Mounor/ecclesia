@@ -1,7 +1,10 @@
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:path/path.dart';
-import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
+import 'package:path/path.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -15,17 +18,48 @@ class DatabaseHelper {
     return _database!;
   }
 
+  Future<void> deleteDatabaseFile() async {
+    String dbPath;
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      dbPath = join(await databaseFactoryFfi.getDatabasesPath(), 'ecclesia.db');
+      await databaseFactoryFfi.deleteDatabase(dbPath);
+    } else {
+      dbPath = join(await getDatabasesPath(), 'ecclesia.db');
+      await deleteDatabase(dbPath);
+    }
+  }
+
   Future<Database> _initDatabase() async {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-    
-    String path = join(await getDatabasesPath(), 'ecclesia.db');
-    return await openDatabase(
-      path,
-      version: 2,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    WidgetsFlutterBinding.ensureInitialized(); // 🟡 مهم جدًا لو بتستدعيها بدري
+
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      // 🖥️ Desktop
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+
+      // في الـ Desktop مش بنستخدم getDatabasesPath()
+      final dbPath = join(
+        await databaseFactoryFfi.getDatabasesPath(),
+        'ecclesia.db',
+      );
+      return await databaseFactoryFfi.openDatabase(
+        dbPath,
+        options: OpenDatabaseOptions(
+          version: 3,
+          onCreate: _onCreate,
+          onUpgrade: _onUpgrade,
+        ),
+      );
+    } else {
+      // 📱 Android / iOS
+      final dbPath = join(await getDatabasesPath(), 'ecclesia.db');
+      return await openDatabase(
+        dbPath,
+        version: 3,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -38,19 +72,38 @@ class DatabaseHelper {
           area_description TEXT
         )
       ''');
-      
+
       // إضافة عمود area_id للأفراد
       await db.execute('ALTER TABLE individuals ADD COLUMN area_id INTEGER');
-      
+
       // إضافة عمود area_id للأسر
       await db.execute('ALTER TABLE families ADD COLUMN area_id INTEGER');
-      
+
       // إضافة بيانات المناطق التجريبية
-      await db.insert('areas', {'area_name': 'مصر الجديدة', 'area_description': 'منطقة مصر الجديدة وما حولها'});
-      await db.insert('areas', {'area_name': 'الدقي', 'area_description': 'منطقة الدقي والمهندسين'});
-      await db.insert('areas', {'area_name': 'مدينة نصر', 'area_description': 'مدينة نصر والمناطق المجاورة'});
-      await db.insert('areas', {'area_name': 'شبرا', 'area_description': 'منطقة شبرا وروض الفرج'});
-      await db.insert('areas', {'area_name': 'الزيتون', 'area_description': 'منطقة الزيتون وحدائق القبة'});
+      await db.insert('areas', {
+        'area_name': 'مصر الجديدة',
+        'area_description': 'منطقة مصر الجديدة وما حولها',
+      });
+      await db.insert('areas', {
+        'area_name': 'الدقي',
+        'area_description': 'منطقة الدقي والمهندسين',
+      });
+      await db.insert('areas', {
+        'area_name': 'مدينة نصر',
+        'area_description': 'مدينة نصر والمناطق المجاورة',
+      });
+      await db.insert('areas', {
+        'area_name': 'شبرا',
+        'area_description': 'منطقة شبرا وروض الفرج',
+      });
+      await db.insert('areas', {
+        'area_name': 'الزيتون',
+        'area_description': 'منطقة الزيتون وحدائق القبة',
+      });
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE individuals ADD COLUMN job_title TEXT');
+      await db.execute('ALTER TABLE individuals ADD COLUMN work_place TEXT');
     }
   }
 
@@ -93,7 +146,17 @@ class DatabaseHelper {
         FOREIGN KEY (responsible_id) REFERENCES servants (id)
       )
     ''');
-
+    // جدول الكنيسة
+    await db.execute('''
+      CREATE TABLE churches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        church_name TEXT NOT NULL,
+        church_logo TEXT,
+        church_country TEXT NOT NULL,
+        diocese_name TEXT NOT NULL,
+        diocese_logo TEXT
+      )
+    ''');
     // جدول الأنشطة
     await db.execute('''
       CREATE TABLE activities (
@@ -142,9 +205,11 @@ class DatabaseHelper {
         current_address TEXT,
         phone TEXT,
         whatsapp TEXT,
-        family_name TEXT,
+        family_id INTEGER NULL,
         education_stage_id INTEGER,
         education_institution TEXT,
+        job_title TEXT, 
+        work_place TEXT, 
         FOREIGN KEY (spouse_id) REFERENCES individuals (id),
         FOREIGN KEY (education_stage_id) REFERENCES education_stages (id),
         FOREIGN KEY (area_id) REFERENCES areas (id)
@@ -239,28 +304,57 @@ class DatabaseHelper {
     await db.insert('users', {
       'username': 'admin',
       'password': hashedPassword,
-      'role': 'admin'
+      'role': 'admin',
     });
   }
 
   // دوال المصادقة
-  Future<Map<String, dynamic>?> authenticateUser(String username, String password) async {
+  Future<Map<String, dynamic>?> authenticateUser(
+    String username,
+    String password,
+  ) async {
     final db = await database;
     String hashedPassword = sha256.convert(utf8.encode(password)).toString();
-    
+
     final result = await db.query(
       'users',
       where: 'username = ? AND password = ?',
       whereArgs: [username, hashedPassword],
     );
-    
+
     return result.isNotEmpty ? result.first : null;
+  }
+
+  // 🏛️ دوال CRUD للكنائس
+  Future<int> insertChurch(Map<String, dynamic> church) async {
+    final db = await database;
+    return await db.insert('churches', church);
+  }
+
+  Future<List<Map<String, dynamic>>> getAllChurches() async {
+    final db = await database;
+    return await db.query('churches');
+  }
+
+  Future<int> updateChurch(int id, Map<String, dynamic> church) async {
+    final db = await database;
+    return await db.update(
+      'churches',
+      church,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deleteChurch(int id) async {
+    final db = await database;
+    return await db.delete('churches', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<int> createUser(String username, String password, String role) async {
     final db = await database;
     String hashedPassword = sha256.convert(utf8.encode(password)).toString();
-    
+
     return await db.insert('users', {
       'username': username,
       'password': hashedPassword,
@@ -281,7 +375,12 @@ class DatabaseHelper {
 
   Future<int> updateIndividual(int id, Map<String, dynamic> individual) async {
     final db = await database;
-    return await db.update('individuals', individual, where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'individuals',
+      individual,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteIndividual(int id) async {
@@ -368,7 +467,12 @@ class DatabaseHelper {
 
   Future<int> updateFamily(int id, Map<String, dynamic> family) async {
     final db = await database;
-    return await db.update('families', family, where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'families',
+      family,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteFamily(int id) async {
@@ -388,17 +492,31 @@ class DatabaseHelper {
 
   Future<int> updateEducationStage(int id, Map<String, dynamic> stage) async {
     final db = await database;
-    return await db.update('education_stages', stage, where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'education_stages',
+      stage,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteEducationStage(int id) async {
     final db = await database;
-    return await db.delete('education_stages', where: 'id = ?', whereArgs: [id]);
+    return await db.delete(
+      'education_stages',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> updateServant(int id, Map<String, dynamic> servant) async {
     final db = await database;
-    return await db.update('servants', servant, where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'servants',
+      servant,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteServant(int id) async {
@@ -428,7 +546,12 @@ class DatabaseHelper {
 
   Future<int> updateActivity(int id, Map<String, dynamic> activity) async {
     final db = await database;
-    return await db.update('activities', activity, where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'activities',
+      activity,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteActivity(int id) async {
@@ -466,7 +589,9 @@ class DatabaseHelper {
   Future<int> updateUser(int id, Map<String, dynamic> user) async {
     final db = await database;
     if (user.containsKey('password')) {
-      user['password'] = sha256.convert(utf8.encode(user['password'])).toString();
+      user['password'] = sha256
+          .convert(utf8.encode(user['password']))
+          .toString();
     }
     return await db.update('users', user, where: 'id = ?', whereArgs: [id]);
   }
@@ -476,17 +601,47 @@ class DatabaseHelper {
     return await db.delete('users', where: 'id = ?', whereArgs: [id]);
   }
 
+  // دوال إدارة أعضاء الأسرة
+  Future<void> addFamilyMember(int familyId, int individualId) async {
+    final db = await database;
+    await db.insert('family_members', {
+      'family_id': familyId,
+      'individual_id': individualId,
+    });
+  }
+
+  Future<void> removeFamilyMember(int familyId, int individualId) async {
+    final db = await database;
+    await db.delete(
+      'family_members',
+      where: 'family_id = ? AND individual_id = ?',
+      whereArgs: [familyId, individualId],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getFamilyMembers(int familyId) async {
+    final db = await database;
+    return await db.rawQuery(
+      '''
+      SELECT i.* FROM individuals i
+      JOIN family_members fm ON i.id = fm.individual_id
+      WHERE fm.family_id = ?
+    ''',
+      [familyId],
+    );
+  }
+
   // تنظيف قاعدة البيانات (حذف جميع البيانات عدا المستخدمين)
   Future<void> clearAllDataExceptUsers() async {
     final db = await database;
-    
+
     // حذف البيانات من جداول العلاقات أولاً
     await db.delete('individual_activities');
     await db.delete('individual_aids');
     await db.delete('individual_sectors');
     await db.delete('children');
     await db.delete('family_members');
-    
+
     // حذف البيانات من الجداول الرئيسية
     await db.delete('individuals');
     await db.delete('families');
@@ -497,5 +652,19 @@ class DatabaseHelper {
     await db.delete('aids');
     await db.delete('education_stages');
     await db.delete('areas');
+  }
+
+  // إعادة تهيئة قاعدة البيانات بالكامل
+  Future<void> resetDatabase() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+
+    // حذف ملف قاعدة البيانات
+    await deleteDatabaseFile();
+
+    // إعادة إنشاء قاعدة البيانات
+    await database;
   }
 }

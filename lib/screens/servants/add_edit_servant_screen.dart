@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/searchable_dropdown.dart';
 import '../../helpers/db_helper.dart';
 
 class AddEditServantScreen extends StatefulWidget {
@@ -94,11 +95,32 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    _buildDropdown('الفرد', _individualId, _individuals, (value) => setState(() => _individualId = value), required: true),
+                    SearchableDropdown<int>(
+                      label: 'الفرد',
+                      value: _individualId,
+                      items: _individuals,
+                      displayKey: 'full_name',
+                      valueKey: 'id',
+                      onChanged: (value) => setState(() => _individualId = value),
+                    ),
                     const SizedBox(height: 16),
-                    _buildDropdown('أب الاعتراف', _confessionFatherId, _priests.map((p) => {...p, 'full_name': p['priest_name']}).toList(), (value) => setState(() => _confessionFatherId = value)),
+                    SearchableDropdown<int>(
+                      label: 'أب الاعتراف',
+                      value: _confessionFatherId,
+                      items: _priests,
+                      displayKey: 'priest_name',
+                      valueKey: 'id',
+                      onChanged: (value) => setState(() => _confessionFatherId = value),
+                    ),
                     const SizedBox(height: 16),
-                    _buildDropdown('القطاع', _sectorId, _sectors.map((s) => {...s, 'full_name': s['sector_name']}).toList(), (value) => setState(() => _sectorId = value)),
+                    SearchableDropdown<int>(
+                      label: 'القطاع',
+                      value: _sectorId,
+                      items: _sectors,
+                      displayKey: 'sector_name',
+                      valueKey: 'id',
+                      onChanged: (value) => setState(() => _sectorId = value),
+                    ),
                     const SizedBox(height: 32),
                     SizedBox(
                       width: double.infinity,

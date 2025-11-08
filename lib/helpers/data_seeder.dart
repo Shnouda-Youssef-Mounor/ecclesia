@@ -17,11 +17,20 @@ class DataSeeder {
 
   static Future<void> _seedAreas() async {
     final areas = [
-      {'area_name': 'مصر الجديدة', 'area_description': 'منطقة مصر الجديدة وما حولها'},
+      {
+        'area_name': 'مصر الجديدة',
+        'area_description': 'منطقة مصر الجديدة وما حولها',
+      },
       {'area_name': 'الدقي', 'area_description': 'منطقة الدقي والمهندسين'},
-      {'area_name': 'مدينة نصر', 'area_description': 'مدينة نصر والمناطق المجاورة'},
+      {
+        'area_name': 'مدينة نصر',
+        'area_description': 'مدينة نصر والمناطق المجاورة',
+      },
       {'area_name': 'شبرا', 'area_description': 'منطقة شبرا وروض الفرج'},
-      {'area_name': 'الزيتون', 'area_description': 'منطقة الزيتون وحدائق القبة'},
+      {
+        'area_name': 'الزيتون',
+        'area_description': 'منطقة الزيتون وحدائق القبة',
+      },
     ];
 
     for (var area in areas) {
@@ -45,9 +54,21 @@ class DataSeeder {
 
   static Future<void> _seedActivities() async {
     final activities = [
-      {'activity_name': 'مدارس الأحد', 'description': 'تعليم ديني للأطفال', 'schedule': 'الأحد 10 صباحاً'},
-      {'activity_name': 'اجتماع الشباب', 'description': 'اجتماع أسبوعي للشباب', 'schedule': 'الجمعة 7 مساءً'},
-      {'activity_name': 'كورال الكنيسة', 'description': 'ترانيم وألحان', 'schedule': 'الثلاثاء 6 مساءً'},
+      {
+        'activity_name': 'مدارس الأحد',
+        'description': 'تعليم ديني للأطفال',
+        'schedule': 'الأحد 10 صباحاً',
+      },
+      {
+        'activity_name': 'اجتماع الشباب',
+        'description': 'اجتماع أسبوعي للشباب',
+        'schedule': 'الجمعة 7 مساءً',
+      },
+      {
+        'activity_name': 'كورال الكنيسة',
+        'description': 'ترانيم وألحان',
+        'schedule': 'الثلاثاء 6 مساءً',
+      },
     ];
 
     for (var activity in activities) {
@@ -57,8 +78,16 @@ class DataSeeder {
 
   static Future<void> _seedAids() async {
     final aids = [
-      {'organization_name': 'جمعية الخير', 'description': 'مساعدات مالية', 'schedule': 'شهرياً'},
-      {'organization_name': 'بنك الطعام', 'description': 'توزيع مواد غذائية', 'schedule': 'أسبوعياً'},
+      {
+        'organization_name': 'جمعية الخير',
+        'description': 'مساعدات مالية',
+        'schedule': 'شهرياً',
+      },
+      {
+        'organization_name': 'بنك الطعام',
+        'description': 'توزيع مواد غذائية',
+        'schedule': 'أسبوعياً',
+      },
     ];
 
     for (var aid in aids) {
@@ -104,9 +133,11 @@ class DataSeeder {
         'current_address': 'شارع الحجاز، مصر الجديدة',
         'phone': '01234567890',
         'whatsapp': '01234567890',
-        'family_name': 'عائلة فهيم',
+        'family_id': 1,
         'education_stage_id': 4,
-        'education_institution': 'جامعة القاهرة - كلية الهندسة'
+        'education_institution': 'جامعة القاهرة - كلية الهندسة',
+        'job_title': 'مهندس برمجيات',
+        'work_place': 'شركة تكنولوجيا',
       },
       {
         'full_name': 'مريم بولس إبراهيم عبد الملك',
@@ -121,9 +152,11 @@ class DataSeeder {
         'current_address': 'شارع التحرير، الدقي',
         'phone': '01234567891',
         'whatsapp': '01234567891',
-        'family_name': 'عائلة فهيم',
+        'family_id': 1,
         'education_stage_id': 4,
-        'education_institution': 'جامعة القاهرة - كلية الطب'
+        'education_institution': 'جامعة القاهرة - كلية الطب',
+        'job_title': 'طبيبة أطفال',
+        'work_place': 'مستشفى القصر العيني',
       },
       {
         'full_name': 'كيرلس مينا جرجس فهيم',
@@ -137,10 +170,47 @@ class DataSeeder {
         'current_address': 'شارع الحجاز، مصر الجديدة',
         'phone': '',
         'whatsapp': '',
-        'family_name': 'عائلة فهيم',
+        'family_id': 1,
         'education_stage_id': 1,
-        'education_institution': 'مدرسة الأنبا أنطونيوس الابتدائية'
-      }
+        'education_institution': 'مدرسة الأنبا أنطونيوس الابتدائية',
+        'job_title': null,
+        'work_place': null,
+      },
+      {
+        'full_name': 'فادي عادل إبراهيم',
+        'national_id': '28705011230111',
+        'governorate': 'القاهرة',
+        'birth_date': '01/05/1987',
+        'gender': 'ذكر',
+        'marital_status': 'أعزب',
+        'military_status': 'أدى الخدمة',
+        'area_id': 3,
+        'area': 'مدينة نصر',
+        'current_address': 'شارع مصطفى النحاس',
+        'phone': '01111111111',
+        'whatsapp': '01111111111',
+        'education_stage_id': 5,
+        'education_institution': 'الجامعة الأمريكية',
+        'job_title': 'محاسب',
+        'work_place': 'شركة استشارات مالية',
+      },
+      {
+        'full_name': 'مارينا جرجس عبد السيد',
+        'national_id': '29810151234555',
+        'governorate': 'الجيزة',
+        'birth_date': '15/10/1998',
+        'gender': 'أنثى',
+        'marital_status': 'أعزب',
+        'area_id': 4,
+        'area': 'شبرا',
+        'current_address': 'روض الفرج',
+        'phone': '01022222222',
+        'whatsapp': '01022222222',
+        'education_stage_id': 4,
+        'education_institution': 'جامعة عين شمس - كلية الآداب',
+        'job_title': 'معلمة لغة عربية',
+        'work_place': 'مدرسة راهبات',
+      },
     ];
 
     for (var individual in individuals) {
@@ -155,8 +225,8 @@ class DataSeeder {
         'family_address': 'شارع الحجاز، مصر الجديدة',
         'area_id': 1,
         'father_id': 1,
-        'mother_id': 2
-      }
+        'mother_id': 2,
+      },
     ];
 
     for (var family in families) {
@@ -166,11 +236,7 @@ class DataSeeder {
 
   static Future<void> _seedServants() async {
     final servants = [
-      {
-        'individual_id': 1,
-        'confession_father_id': 1,
-        'sector_id': 2
-      }
+      {'individual_id': 1, 'confession_father_id': 1, 'sector_id': 2},
     ];
 
     for (var servant in servants) {

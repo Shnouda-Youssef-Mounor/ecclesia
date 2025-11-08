@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/searchable_dropdown.dart';
 import '../../helpers/db_helper.dart';
 
 class AddEditPriestScreen extends StatefulWidget {
@@ -94,7 +95,14 @@ class _AddEditPriestScreenState extends State<AddEditPriestScreen> {
                     const SizedBox(height: 16),
                     _buildTextField(_phoneController, 'رقم الهاتف', Icons.phone),
                     const SizedBox(height: 16),
-                    _buildDropdown(),
+                    SearchableDropdown<int>(
+                      label: 'القطاع المسؤول عنه',
+                      value: _sectorId,
+                      items: _sectors,
+                      displayKey: 'sector_name',
+                      valueKey: 'id',
+                      onChanged: (value) => setState(() => _sectorId = value),
+                    ),
                     const SizedBox(height: 32),
                     SizedBox(
                       width: double.infinity,

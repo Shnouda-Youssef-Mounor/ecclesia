@@ -1,30 +1,43 @@
+import 'dart:io';
+
+import 'package:ecclesia/screens/church/view_church_screen.dart';
+import 'package:ecclesia/utils/app_footer.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path/path.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
 import 'helpers/cache_helper.dart';
 import 'helpers/db_helper.dart';
-import 'helpers/db_reset.dart';
-import 'helpers/data_seeder.dart';
-import 'services/auth_service.dart';
-import 'screens/auth/login_screen.dart';
-import 'screens/individuals/individuals_screen.dart';
-import 'screens/families/families_screen.dart';
-import 'screens/sectors/sectors_screen.dart';
-import 'screens/education_stages/education_stages_screen.dart';
-import 'screens/servants/servants_screen.dart';
-import 'screens/priests/priests_screen.dart';
-import 'screens/aids/aids_screen.dart';
 import 'screens/activities/activities_screen.dart';
+import 'screens/aids/aids_screen.dart';
 import 'screens/areas/areas_screen.dart';
-import 'screens/users/users_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/education_stages/education_stages_screen.dart';
+import 'screens/families/families_screen.dart';
+import 'screens/individuals/individuals_screen.dart';
+import 'screens/priests/priests_screen.dart';
+import 'screens/sectors/sectors_screen.dart';
+import 'screens/servants/servants_screen.dart';
 import 'screens/users/roles_screen.dart';
+import 'screens/users/users_screen.dart';
+import 'services/auth_service.dart';
 import 'utils/app_colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await CacheHelper.init();
-  await DatabaseHelper().database; // تهيئة قاعدة البيانات
 
-  // فحص وجود بيانات قبل الإضافة
+  // 🖥️ تهيئة قاعدة البيانات على Desktop
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    sqfliteFfiInit();
+  }
+
+  await CacheHelper.init();
+  //await _deleteOldDatabase();
+  // 🗃️ تهيئة قاعدة البيانات
+  await DatabaseHelper().database;
+
+  // 📝 لو عايز تزرع بيانات أولية
   final db = DatabaseHelper();
   final individuals = await db.getAllIndividuals();
   if (individuals.isEmpty) {
@@ -32,6 +45,20 @@ void main() async {
   }
 
   runApp(const MyApp());
+}
+
+Future<void> _deleteOldDatabase() async {
+  String dbPath;
+
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    dbPath = join(await databaseFactoryFfi.getDatabasesPath(), 'ecclesia.db');
+    await databaseFactoryFfi.deleteDatabase(dbPath);
+  } else {
+    dbPath = join(await getDatabasesPath(), 'ecclesia.db');
+    await deleteDatabase(dbPath);
+  }
+
+  print('✅ تم حذف قاعدة البيانات القديمة بنجاح');
 }
 
 class MyApp extends StatelessWidget {
@@ -78,6 +105,7 @@ class HomeScreen extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        bottomNavigationBar: AppFooter(),
         body: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -96,7 +124,7 @@ class HomeScreen extends StatelessWidget {
                 _buildHeader(context, user),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
                         _buildWelcomeCard(user),
@@ -311,6 +339,11 @@ class HomeScreen extends StatelessWidget {
           'title': 'إدارة المستخدمين',
           'icon': Icons.admin_panel_settings,
           'screen': const UsersScreen(),
+        },
+        {
+          'title': 'إدارة الكنيسة',
+          'icon': Icons.church,
+          'screen': const ViewChurchScreen(),
         },
         {
           'title': 'الأدوار والصلاحيات',
@@ -552,7 +585,7 @@ class HomeScreen extends StatelessWidget {
     );
 
     try {
-      await DatabaseHelper().clearAllDataExceptUsers();
+      await DatabaseHelper().resetDatabase();
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
