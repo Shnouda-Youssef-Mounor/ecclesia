@@ -413,15 +413,15 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                   );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'فشل في إنشاء التقرير',
-                        style: GoogleFonts.cairo(),
+                      SnackBar(
+                        content: Text(
+                          'فشل في إنشاء التقرير. يجب التأكد من بيانات الكنيسة من صفحة الإدارة الكنسية.',
+                          style: GoogleFonts.cairo(),
+                        ),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 2),
                       ),
-                      backgroundColor: Colors.red,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
+                    );
                 }
               },
               backgroundColor: AppColors.light,
