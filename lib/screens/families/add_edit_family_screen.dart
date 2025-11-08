@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../helpers/db_helper.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/searchable_dropdown.dart';
-import '../../helpers/db_helper.dart';
 
 class AddEditFamilyScreen extends StatefulWidget {
   final Map<String, dynamic>? family;
@@ -16,10 +17,10 @@ class AddEditFamilyScreen extends StatefulWidget {
 class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
   final _formKey = GlobalKey<FormState>();
   final DatabaseHelper _db = DatabaseHelper();
-  
+
   final _familyNameController = TextEditingController();
   final _addressController = TextEditingController();
-  
+
   int? _fatherId;
   int? _motherId;
   int? _selectedAreaId;
@@ -39,9 +40,19 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
   }
 
   Future<void> _loadData() async {
-    _individuals = await _db.getAllIndividuals();
-    _areas = await _db.getAllAreas();
-    setState(() {});
+    try {
+      final results = await Future.wait([
+        _db.getAllIndividuals(),
+        _db.getAllAreas(),
+      ]);
+
+      setState(() {
+        _individuals = results[0];
+        _areas = results[1];
+      });
+    } catch (e) {
+      debugPrint('Error loading data: $e');
+    }
   }
 
   Future<void> _loadFamilyMembers() async {
@@ -56,8 +67,6 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
       }
     }
   }
-
-
 
   void _loadFamilyData() {
     final family = widget.family!;
@@ -88,7 +97,7 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
       } else {
         familyId = widget.family!['id'];
         await _db.updateFamily(familyId, data);
-        
+
         // حذف الأعضاء الحاليين
         final currentMembers = await _db.getFamilyMembers(familyId);
         for (final member in currentMembers) {
@@ -103,7 +112,7 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
       if (_motherId != null) {
         await _db.addFamilyMember(familyId, _motherId!);
       }
-      
+
       // إضافة باقي الأعضاء
       for (final memberId in _selectedMembers) {
         await _db.addFamilyMember(familyId, memberId);
@@ -111,9 +120,9 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
 
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
     }
 
     setState(() => _isLoading = false);
@@ -122,7 +131,7 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
-    
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -138,12 +147,18 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
           padding: EdgeInsets.all(isDesktop ? 32 : 16),
           child: Center(
             child: Container(
-              constraints: BoxConstraints(maxWidth: isDesktop ? 600 : double.infinity),
+              constraints: BoxConstraints(
+                maxWidth: isDesktop ? 600 : double.infinity,
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    _buildTextField(_familyNameController, 'اسم الأسرة', required: true),
+                    _buildTextField(
+                      _familyNameController,
+                      'اسم الأسرة',
+                      required: true,
+                    ),
                     const SizedBox(height: 16),
                     _buildTextField(_addressController, 'عنوان الأسرة'),
                     const SizedBox(height: 16),
@@ -153,13 +168,16 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
                       items: _areas,
                       displayKey: 'area_name',
                       valueKey: 'id',
-                      onChanged: (value) => setState(() => _selectedAreaId = value),
+                      onChanged: (value) =>
+                          setState(() => _selectedAreaId = value),
                     ),
                     const SizedBox(height: 16),
                     SearchableDropdown<int>(
                       label: 'الأب',
                       value: _fatherId,
-                      items: _individuals.where((i) => i['gender'] == 'ذكر').toList(),
+                      items: _individuals
+                          .where((i) => i['gender'] == 'ذكر')
+                          .toList(),
                       displayKey: 'full_name',
                       valueKey: 'id',
                       onChanged: (value) => setState(() => _fatherId = value),
@@ -168,7 +186,9 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
                     SearchableDropdown<int>(
                       label: 'الأم',
                       value: _motherId,
-                      items: _individuals.where((i) => i['gender'] == 'أنثى').toList(),
+                      items: _individuals
+                          .where((i) => i['gender'] == 'أنثى')
+                          .toList(),
                       displayKey: 'full_name',
                       valueKey: 'id',
                       onChanged: (value) => setState(() => _motherId = value),
@@ -186,10 +206,15 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
                           foregroundColor: Colors.white,
                         ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
                             : Text(
                                 'حفظ',
-                                style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w600),
+                                style: GoogleFonts.cairo(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                       ),
                     ),
@@ -203,7 +228,11 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool required = false}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label, {
+    bool required = false,
+  }) {
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
@@ -212,11 +241,18 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       ),
       style: GoogleFonts.cairo(),
-      validator: required ? (value) => value?.isEmpty == true ? 'هذا الحقل مطلوب' : null : null,
+      validator: required
+          ? (value) => value?.isEmpty == true ? 'هذا الحقل مطلوب' : null
+          : null,
     );
   }
 
-  Widget _buildDropdown(String label, int? value, List<Map<String, dynamic>> items, Function(int?) onChanged) {
+  Widget _buildDropdown(
+    String label,
+    int? value,
+    List<Map<String, dynamic>> items,
+    Function(int?) onChanged,
+  ) {
     return DropdownButtonFormField<int>(
       value: value,
       decoration: InputDecoration(
@@ -229,10 +265,12 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
           value: null,
           child: Text('اختر $label', style: GoogleFonts.cairo()),
         ),
-        ...items.map((item) => DropdownMenuItem<int>(
-          value: item['id'],
-          child: Text(item['full_name'] ?? '', style: GoogleFonts.cairo()),
-        )),
+        ...items.map(
+          (item) => DropdownMenuItem<int>(
+            value: item['id'],
+            child: Text(item['full_name'] ?? '', style: GoogleFonts.cairo()),
+          ),
+        ),
       ],
       onChanged: onChanged,
     );
@@ -251,10 +289,12 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
           value: null,
           child: Text('اختر المنطقة', style: GoogleFonts.cairo()),
         ),
-        ..._areas.map((area) => DropdownMenuItem<int>(
-          value: area['id'],
-          child: Text(area['area_name'] ?? '', style: GoogleFonts.cairo()),
-        )),
+        ..._areas.map(
+          (area) => DropdownMenuItem<int>(
+            value: area['id'],
+            child: Text(area['area_name'] ?? '', style: GoogleFonts.cairo()),
+          ),
+        ),
       ],
       onChanged: (value) => setState(() => _selectedAreaId = value),
     );
@@ -287,12 +327,13 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
                   itemBuilder: (context, index) {
                     final individual = _individuals[index];
                     final individualId = individual['id'];
-                    
+
                     // استثناء الأب والأم من قائمة الأعضاء
-                    if (individualId == _fatherId || individualId == _motherId) {
+                    if (individualId == _fatherId ||
+                        individualId == _motherId) {
                       return const SizedBox.shrink();
                     }
-                    
+
                     final isSelected = _selectedMembers.contains(individualId);
                     return CheckboxListTile(
                       title: Text(
@@ -301,7 +342,10 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
                       ),
                       subtitle: Text(
                         individual['national_id'] ?? '',
-                        style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                        style: GoogleFonts.cairo(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                       ),
                       value: isSelected,
                       onChanged: (value) {

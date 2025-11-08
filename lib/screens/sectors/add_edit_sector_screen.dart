@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../utils/app_colors.dart';
+
 import '../../helpers/db_helper.dart';
+import '../../utils/app_colors.dart';
 
 class AddEditSectorScreen extends StatefulWidget {
   final Map<String, dynamic>? sector;
@@ -15,33 +16,28 @@ class AddEditSectorScreen extends StatefulWidget {
 class _AddEditSectorScreenState extends State<AddEditSectorScreen> {
   final _formKey = GlobalKey<FormState>();
   final DatabaseHelper _db = DatabaseHelper();
-  
+
   final _sectorNameController = TextEditingController();
   final _meetingTimeController = TextEditingController();
-  
+
   int? _responsibleId;
-  List<Map<String, dynamic>> _servants = [];
+  List<Map<String, dynamic>> _priests = [];
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadServants();
+    _loadPriests();
     if (widget.sector != null) {
       _loadSectorData();
     }
   }
 
-  Future<void> _loadServants() async {
-    final servants = await _db.getAllServants();
-    final individuals = await _db.getAllIndividuals();
-    
-    _servants = servants.map((servant) {
-      final individual = individuals.firstWhere((i) => i['id'] == servant['individual_id'], orElse: () => {});
-      return {...servant, ...individual};
-    }).toList();
-    
-    setState(() {});
+  Future<void> _loadPriests() async {
+    final priests = await _db.getAllPriests();
+    setState(() {
+      _priests = priests;
+    });
   }
 
   void _loadSectorData() {
@@ -70,7 +66,9 @@ class _AddEditSectorScreenState extends State<AddEditSectorScreen> {
       }
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
     }
 
     setState(() => _isLoading = false);
@@ -79,12 +77,15 @@ class _AddEditSectorScreenState extends State<AddEditSectorScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
-    
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.sector == null ? 'إضافة قطاع' : 'تعديل قطاع', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          title: Text(
+            widget.sector == null ? 'إضافة قطاع' : 'تعديل قطاع',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+          ),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
@@ -92,14 +93,25 @@ class _AddEditSectorScreenState extends State<AddEditSectorScreen> {
           padding: EdgeInsets.all(isDesktop ? 32 : 16),
           child: Center(
             child: Container(
-              constraints: BoxConstraints(maxWidth: isDesktop ? 600 : double.infinity),
+              constraints: BoxConstraints(
+                maxWidth: isDesktop ? 600 : double.infinity,
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    _buildTextField(_sectorNameController, 'اسم القطاع', Icons.category, required: true),
+                    _buildTextField(
+                      _sectorNameController,
+                      'اسم القطاع',
+                      Icons.category,
+                      required: true,
+                    ),
                     const SizedBox(height: 16),
-                    _buildTextField(_meetingTimeController, 'موعد الاجتماع', Icons.schedule),
+                    _buildTextField(
+                      _meetingTimeController,
+                      'موعد الاجتماع',
+                      Icons.schedule,
+                    ),
                     const SizedBox(height: 16),
                     _buildDropdown(),
                     const SizedBox(height: 32),
@@ -108,10 +120,24 @@ class _AddEditSectorScreenState extends State<AddEditSectorScreen> {
                       height: 50,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _saveSector,
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : Text('حفظ', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w600)),
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : Text(
+                                'حفظ',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -124,7 +150,12 @@ class _AddEditSectorScreenState extends State<AddEditSectorScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool required = false}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool required = false,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.grey[50],
@@ -138,10 +169,15 @@ class _AddEditSectorScreenState extends State<AddEditSectorScreen> {
           labelStyle: GoogleFonts.cairo(color: AppColors.secondary),
           prefixIcon: Icon(icon, color: AppColors.primary),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
         ),
         style: GoogleFonts.cairo(),
-        validator: required ? (value) => value?.isEmpty == true ? 'هذا الحقل مطلوب' : null : null,
+        validator: required
+            ? (value) => value?.isEmpty == true ? 'هذا الحقل مطلوب' : null
+            : null,
       ),
     );
   }
@@ -160,11 +196,25 @@ class _AddEditSectorScreenState extends State<AddEditSectorScreen> {
           labelStyle: GoogleFonts.cairo(color: AppColors.secondary),
           prefixIcon: Icon(Icons.person_pin, color: AppColors.primary),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
         ),
         items: [
-          DropdownMenuItem<int>(value: null, child: Text('اختر مسؤول القطاع', style: GoogleFonts.cairo())),
-          ..._servants.map((servant) => DropdownMenuItem<int>(value: servant['id'], child: Text(servant['full_name'] ?? '', style: GoogleFonts.cairo()))),
+          DropdownMenuItem<int>(
+            value: null,
+            child: Text('اختر مسؤول القطاع', style: GoogleFonts.cairo()),
+          ),
+          ..._priests.map(
+            (servant) => DropdownMenuItem<int>(
+              value: servant['id'],
+              child: Text(
+                servant['priest_name'] ?? 'غير موجود',
+                style: GoogleFonts.cairo(color: AppColors.secondary),
+              ),
+            ),
+          ),
         ],
         onChanged: (value) => setState(() => _responsibleId = value),
       ),

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../helpers/db_helper.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/searchable_dropdown.dart';
-import '../../helpers/db_helper.dart';
 
 class AddEditServantScreen extends StatefulWidget {
   final Map<String, dynamic>? servant;
@@ -16,11 +17,11 @@ class AddEditServantScreen extends StatefulWidget {
 class _AddEditServantScreenState extends State<AddEditServantScreen> {
   final _formKey = GlobalKey<FormState>();
   final DatabaseHelper _db = DatabaseHelper();
-  
+
   int? _individualId;
   int? _confessionFatherId;
   int? _sectorId;
-  
+
   List<Map<String, dynamic>> _individuals = [];
   List<Map<String, dynamic>> _priests = [];
   List<Map<String, dynamic>> _sectors = [];
@@ -36,10 +37,25 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
   }
 
   Future<void> _loadData() async {
-    _individuals = await _db.getAllIndividuals();
-    _priests = await _db.getAllPriests();
-    _sectors = await _db.getAllSectors();
-    setState(() {});
+    setState(() => _isLoading = true);
+
+    try {
+      final results = await Future.wait([
+        _db.getAllIndividuals(),
+        _db.getAllPriests(),
+        _db.getAllSectors(),
+      ]);
+
+      setState(() {
+        _individuals = results[0];
+        _priests = results[1];
+        _sectors = results[2];
+      });
+    } catch (e) {
+      debugPrint('Error loading data: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _loadServantData() {
@@ -68,7 +84,9 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
       }
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
     }
 
     setState(() => _isLoading = false);
@@ -77,12 +95,15 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
-    
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.servant == null ? 'إضافة خادم' : 'تعديل خادم', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          title: Text(
+            widget.servant == null ? 'إضافة خادم' : 'تعديل خادم',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+          ),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
@@ -90,7 +111,9 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
           padding: EdgeInsets.all(isDesktop ? 32 : 16),
           child: Center(
             child: Container(
-              constraints: BoxConstraints(maxWidth: isDesktop ? 600 : double.infinity),
+              constraints: BoxConstraints(
+                maxWidth: isDesktop ? 600 : double.infinity,
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -101,7 +124,8 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
                       items: _individuals,
                       displayKey: 'full_name',
                       valueKey: 'id',
-                      onChanged: (value) => setState(() => _individualId = value),
+                      onChanged: (value) =>
+                          setState(() => _individualId = value),
                     ),
                     const SizedBox(height: 16),
                     SearchableDropdown<int>(
@@ -110,7 +134,8 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
                       items: _priests,
                       displayKey: 'priest_name',
                       valueKey: 'id',
-                      onChanged: (value) => setState(() => _confessionFatherId = value),
+                      onChanged: (value) =>
+                          setState(() => _confessionFatherId = value),
                     ),
                     const SizedBox(height: 16),
                     SearchableDropdown<int>(
@@ -127,10 +152,24 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
                       height: 50,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _saveServant,
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : Text('حفظ', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w600)),
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : Text(
+                                'حفظ',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -143,9 +182,19 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
     );
   }
 
-  Widget _buildDropdown(String label, int? value, List<Map<String, dynamic>> items, Function(int?) onChanged, {bool required = false}) {
+  Widget _buildDropdown(
+    String label,
+    int? value,
+    List<Map<String, dynamic>> items,
+    Function(int?) onChanged, {
+    bool required = false,
+  }) {
     return Container(
-      decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.accent.withOpacity(0.3))),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+      ),
       child: DropdownButtonFormField<int>(
         value: value,
         decoration: InputDecoration(
@@ -153,14 +202,27 @@ class _AddEditServantScreenState extends State<AddEditServantScreen> {
           labelStyle: GoogleFonts.cairo(color: AppColors.secondary),
           prefixIcon: Icon(Icons.person, color: AppColors.primary),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
         ),
         items: [
-          DropdownMenuItem<int>(value: null, child: Text('اختر $label', style: GoogleFonts.cairo())),
-          ...items.map((item) => DropdownMenuItem<int>(value: item['id'], child: Text(item['full_name'] ?? '', style: GoogleFonts.cairo()))),
+          DropdownMenuItem<int>(
+            value: null,
+            child: Text('اختر $label', style: GoogleFonts.cairo()),
+          ),
+          ...items.map(
+            (item) => DropdownMenuItem<int>(
+              value: item['id'],
+              child: Text(item['full_name'] ?? '', style: GoogleFonts.cairo()),
+            ),
+          ),
         ],
         onChanged: onChanged,
-        validator: required ? (value) => value == null ? 'هذا الحقل مطلوب' : null : null,
+        validator: required
+            ? (value) => value == null ? 'هذا الحقل مطلوب' : null
+            : null,
       ),
     );
   }

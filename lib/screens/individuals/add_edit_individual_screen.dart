@@ -57,18 +57,24 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
   }
 
   Future<void> _loadAreas() async {
-    _areas = await _db.getAllAreas();
-    setState(() {});
+    final areas = await _db.getAllAreas();
+    setState(() {
+      _areas = areas;
+    });
   }
 
   Future<void> _loadFamilies() async {
-    _families = await _db.getAllFamilies();
-    setState(() {});
+    final families = await _db.getAllFamilies();
+    setState(() {
+      _families = families;
+    });
   }
 
   Future<void> _loadEducationStages() async {
-    _educationStages = await _db.getAllEducationStages();
-    setState(() {});
+    final stages = await _db.getAllEducationStages();
+    setState(() {
+      _educationStages = stages;
+    });
   }
 
   void _loadIndividualData() {
