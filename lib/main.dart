@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:ecclesia/screens/church/view_church_screen.dart';
+import 'package:ecclesia/screens/settings/settings_page.dart';
 import 'package:ecclesia/utils/app_footer.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -350,6 +351,11 @@ class HomeScreen extends StatelessWidget {
           'icon': Icons.security,
           'screen': const RolesScreen(),
         },
+        {
+          'title': 'الاعدادات',
+          'icon': Icons.security,
+          'screen': SettingsPage(),
+        }
       ]);
     }
 

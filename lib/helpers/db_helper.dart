@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class DatabaseHelper {
@@ -668,4 +670,87 @@ class DatabaseHelper {
     // إعادة إنشاء قاعدة البيانات
     await database;
   }
+  
+Future<String> backupDatabase() async {
+  try {
+    // تحديد مكان قاعدة البيانات الأصلية
+    String originalDbPath;
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      originalDbPath = join(await databaseFactoryFfi.getDatabasesPath(), 'ecclesia.db');
+    } else {
+      originalDbPath = join(await getDatabasesPath(), 'ecclesia.db');
+    }
+
+    final originalFile = File(originalDbPath);
+
+    // يختار المستخدم مكان حفظ النسخة
+    String? outputDir = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'اختر مكان حفظ النسخة الاحتياطية',
+    );
+
+    if (outputDir == null) {
+      throw Exception('لم يتم اختيار مجلد للنسخ الاحتياطي');
+    }
+
+    // اسم النسخة الاحتياطية
+    final backupPath = join(outputDir, 'ecclesia_backup_${DateTime.now().millisecondsSinceEpoch}.db');
+
+    // نسخ الملف
+    await originalFile.copy(backupPath);
+
+    print('تم النسخ الاحتياطي إلى: $backupPath');
+    return backupPath;
+  } catch (e) {
+    print('فشل في عمل النسخة الاحتياطية: $e');
+    rethrow;
+  }
+}
+
+
+Future<void> restoreDatabase() async {
+  try {
+    // اختيار ملف النسخة الاحتياطية من المستخدم
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'اختر ملف النسخة الاحتياطية للاستعادة',
+      type: FileType.custom,
+      allowedExtensions: ['db'],
+    );
+
+    if (result == null || result.files.single.path == null) {
+      throw Exception('لم يتم اختيار أي ملف');
+    }
+
+    String backupPath = result.files.single.path!;
+
+    // إغلاق قاعدة البيانات الحالية
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+
+    // مسار القاعدة الأصلية
+    String originalDbPath;
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      originalDbPath = join(await databaseFactoryFfi.getDatabasesPath(), 'ecclesia.db');
+    } else {
+      originalDbPath = join(await getDatabasesPath(), 'ecclesia.db');
+    }
+
+    final backupFile = File(backupPath);
+    final originalFile = File(originalDbPath);
+
+    if (await backupFile.exists()) {
+      await backupFile.copy(originalFile.path);
+    } else {
+      throw Exception('ملف النسخة الاحتياطية غير موجود!');
+    }
+
+    await database;
+    print('تم استعادة قاعدة البيانات بنجاح');
+  } catch (e) {
+    print('فشل في استعادة قاعدة البيانات: $e');
+    rethrow;
+  }
+}
+
 }
