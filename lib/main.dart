@@ -193,7 +193,7 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
-         /* if (AuthService.isAdmin())
+          if (AuthService.isAdmin())
             Container(
               margin: const EdgeInsets.only(left: 8),
               decoration: BoxDecoration(
@@ -205,21 +205,21 @@ class HomeScreen extends StatelessWidget {
                 icon: const Icon(Icons.refresh, color: Colors.white),
                 tooltip: 'إعادة تعيين قاعدة البيانات',
               ),
-            ),*/
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: IconButton(
-                onPressed: () async {
-                  await AuthService.logout();
-                  Navigator.pushReplacementNamed(context, '/login');
-                },
-                icon: const Icon(Icons.logout, color: Colors.white),
-                tooltip: 'تسجيل الخروج',
-              ),
             ),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              onPressed: () async {
+                await AuthService.logout();
+                Navigator.pushReplacementNamed(context, '/login');
+              },
+              icon: const Icon(Icons.logout, color: Colors.white),
+              tooltip: 'تسجيل الخروج',
+            ),
+          ),
         ],
       ),
     );
@@ -355,7 +355,7 @@ class HomeScreen extends StatelessWidget {
           'title': 'الاعدادات',
           'icon': Icons.security,
           'screen': SettingsPage(),
-        }
+        },
       ]);
     }
 

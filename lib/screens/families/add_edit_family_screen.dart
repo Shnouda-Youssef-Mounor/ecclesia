@@ -50,6 +50,14 @@ class _AddEditFamilyScreenState extends State<AddEditFamilyScreen> {
         _individuals = results[0];
         _areas = results[1];
       });
+      
+      // Debug: طباعة قيم النوع
+      print('Total individuals: ${_individuals.length}');
+      for (var individual in _individuals) {
+        print('Name: ${individual['full_name']}, Gender: "${individual['gender']}"');
+      }
+      print('Males: ${_individuals.where((i) => i['gender'] == 'ذكر').length}');
+      print('Females: ${_individuals.where((i) => i['gender'] == 'أنثى').length}');
     } catch (e) {
       debugPrint('Error loading data: $e');
     }

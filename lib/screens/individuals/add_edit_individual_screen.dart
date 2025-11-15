@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:multi_select_flutter/multi_select_flutter.dart';
 
 import '../../helpers/db_helper.dart';
 import '../../utils/app_colors.dart';
@@ -26,7 +27,6 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
   final _whatsappController = TextEditingController();
   final _areaController = TextEditingController();
   final _addressController = TextEditingController();
-  final _familyController = TextEditingController();
   final _educationController = TextEditingController();
 
   String? _maritalStatus;
@@ -35,38 +35,54 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
   String? _birthDate;
   String? _gender;
   int? _selectedAreaId;
-  int? _selectedFamilyId;
 
   List<Map<String, dynamic>> _areas = [];
-  List<Map<String, dynamic>> _families = [];
   List<Map<String, dynamic>> _educationStages = [];
   int? _selectedEducationStageId;
   final _workController = TextEditingController();
   final _workAddressController = TextEditingController();
   bool _isLoading = false;
+  List<Map<String, dynamic>> _activities = [];
+  List<Map<String, dynamic>> _aids = [];
+  List<Map<String, dynamic>> _sectors = [];
 
+  List<int> _selectedActivityIds = [];
+  List<int> _selectedAidIds = [];
+  List<int> _selectedSectorIds = [];
+
+  @override
   @override
   void initState() {
     super.initState();
     _loadAreas();
-    _loadFamilies();
     _loadEducationStages();
+    _loadActivities();
+    _loadAids();
+    _loadSectors();
     if (widget.individual != null) {
       _loadIndividualData();
     }
+  }
+
+  Future<void> _loadActivities() async {
+    final activities = await _db.getAllActivities();
+    setState(() => _activities = activities);
+  }
+
+  Future<void> _loadAids() async {
+    final aids = await _db.getAllAids();
+    setState(() => _aids = aids);
+  }
+
+  Future<void> _loadSectors() async {
+    final sectors = await _db.getAllSectors();
+    setState(() => _sectors = sectors);
   }
 
   Future<void> _loadAreas() async {
     final areas = await _db.getAllAreas();
     setState(() {
       _areas = areas;
-    });
-  }
-
-  Future<void> _loadFamilies() async {
-    final families = await _db.getAllFamilies();
-    setState(() {
-      _families = families;
     });
   }
 
@@ -86,7 +102,6 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
     _areaController.text = individual['area'] ?? '';
     _selectedAreaId = individual['area_id'];
     _addressController.text = individual['current_address'] ?? '';
-    _selectedFamilyId = individual['family_id'];
     _selectedEducationStageId = individual['education_stage_id'];
     _educationController.text = individual['education_institution'] ?? '';
     _maritalStatus = individual['marital_status'];
@@ -96,6 +111,9 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
     _gender = individual['gender'];
     _workController.text = individual['job_title'] ?? '';
     _workAddressController.text = individual['work_place'] ?? '';
+    _selectedActivityIds = List<int>.from(individual['activity_ids'] ?? []);
+    _selectedAidIds = List<int>.from(individual['aid_ids'] ?? []);
+    _selectedSectorIds = List<int>.from(individual['sector_ids'] ?? []);
   }
 
   void _parseNationalId() {
@@ -131,7 +149,6 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
       'current_address': _addressController.text,
       'phone': _phoneController.text,
       'whatsapp': _whatsappController.text,
-      'family_id': _selectedFamilyId,
       'education_stage_id': _selectedEducationStageId,
       'job_title': _workController.text,
       'work_place': _workAddressController.text,
@@ -139,11 +156,38 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
     };
 
     try {
+      int individualId;
       if (widget.individual == null) {
-        await _db.insertIndividual(data);
+        individualId = await _db.insertIndividual(data);
       } else {
-        await _db.updateIndividual(widget.individual!['id'], data);
+        individualId = widget.individual!['id'];
+        await _db.updateIndividual(individualId, data);
+        // حذف العلاقات القديمة
+        await _db.deleteIndividualActivities(individualId);
+        await _db.deleteIndividualAids(individualId);
+        await _db.deleteIndividualSectors(individualId);
       }
+
+      // حفظ العلاقات الجديدة
+      for (var actId in _selectedActivityIds) {
+        await _db.insertIndividualActivity({
+          'individual_id': individualId,
+          'activity_id': actId,
+        });
+      }
+      for (var aidId in _selectedAidIds) {
+        await _db.insertIndividualAid({
+          'individual_id': individualId,
+          'aid_id': aidId,
+        });
+      }
+      for (var sectorId in _selectedSectorIds) {
+        await _db.insertIndividualSector({
+          'individual_id': individualId,
+          'sector_id': sectorId,
+        });
+      }
+
       Navigator.pop(context);
     } catch (e) {
       print('Error saving individual: $e');
@@ -220,6 +264,8 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
           ],
         ),
         const SizedBox(height: 16),
+        _buildParsedInfo(),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(child: _buildTextField(_phoneController, 'رقم الهاتف')),
@@ -249,8 +295,6 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildFamilyDropdown()),
-            const SizedBox(width: 16),
             if (_gender == 'ذكر')
               Expanded(
                 child: _buildDropdown(
@@ -272,8 +316,67 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
         const SizedBox(height: 16),
         _buildTextField(_educationController, 'جهة التعليم'),
         const SizedBox(height: 16),
-        _buildParsedInfo(),
+        _buildActivitiesSelector(),
+        const SizedBox(height: 16),
+        _buildAidsSelector(),
+        const SizedBox(height: 16),
+        _buildSectorsSelector(),
       ],
+    );
+  }
+
+  Widget _buildActivitiesSelector() {
+    return MultiSelectDialogField<int>(
+      items: _activities
+          .map(
+            (e) => MultiSelectItem<int>(
+              e['id'] as int,
+              e['activity_name'] as String,
+            ),
+          )
+          .toList(),
+      title: const Text("الأنشطة"),
+      buttonText: const Text("اختر الأنشطة"),
+      initialValue: _selectedActivityIds,
+      onConfirm: (values) {
+        setState(() => _selectedActivityIds = values);
+      },
+    );
+  }
+
+  Widget _buildAidsSelector() {
+    return MultiSelectDialogField<int>(
+      items: _aids
+          .map(
+            (e) =>
+                MultiSelectItem<int>(e['id'] as int, e['aid_name'] as String),
+          )
+          .toList(),
+      title: const Text("المساعدات"),
+      buttonText: const Text("اختر المساعدات"),
+      initialValue: _selectedAidIds,
+      onConfirm: (values) {
+        setState(() => _selectedAidIds = values);
+      },
+    );
+  }
+
+  Widget _buildSectorsSelector() {
+    return MultiSelectDialogField<int>(
+      items: _sectors
+          .map(
+            (e) => MultiSelectItem<int>(
+              e['id'] as int,
+              e['sector_name'] as String,
+            ),
+          )
+          .toList(),
+      title: const Text("القطاعات"),
+      buttonText: const Text("اختر القطاعات"),
+      initialValue: _selectedSectorIds,
+      onConfirm: (values) {
+        setState(() => _selectedSectorIds = values);
+      },
     );
   }
 
@@ -283,6 +386,8 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
         _buildTextField(_nameController, 'الاسم الرباعي *', required: true),
         const SizedBox(height: 16),
         _buildNationalIdField(),
+        const SizedBox(height: 16),
+        _buildParsedInfo(),
         const SizedBox(height: 16),
         _buildTextField(_phoneController, 'رقم الهاتف'),
         const SizedBox(height: 16),
@@ -298,8 +403,6 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
         ),
         const SizedBox(height: 16),
         _buildTextField(_addressController, 'العنوان الحالي'),
-        const SizedBox(height: 16),
-        _buildFamilyDropdown(),
         const SizedBox(height: 16),
         if (_gender == 'ذكر') ...[
           _buildDropdown(
@@ -318,7 +421,11 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
         const SizedBox(height: 16),
         _buildTextField(_educationController, 'جهة التعليم'),
         const SizedBox(height: 16),
-        _buildParsedInfo(),
+        _buildActivitiesSelector(),
+        const SizedBox(height: 16),
+        _buildAidsSelector(),
+        const SizedBox(height: 16),
+        _buildSectorsSelector(),
       ],
     );
   }
@@ -368,8 +475,15 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
     List<String> items,
     Function(String?) onChanged,
   ) {
+    // لو في قيمة ومش موجودة في الليست → ضيفها
+    if (value != null && value.isNotEmpty && !items.contains(value)) {
+      items = [...items, value];
+    }
+
     return DropdownButtonFormField<String>(
-      value: value,
+      value: (value != null && value.isNotEmpty && items.contains(value))
+          ? value
+          : null,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.cairo(),
@@ -433,29 +547,6 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
             _areaController.text = selectedArea['area_name'] ?? '';
           } else {
             _areaController.text = '';
-          }
-        });
-      },
-    );
-  }
-
-  Widget _buildFamilyDropdown() {
-    return SearchableDropdown<int>(
-      label: 'العائلة',
-      value: _selectedFamilyId,
-      items: _families,
-      displayKey: 'family_name',
-      valueKey: 'id',
-      onChanged: (value) {
-        setState(() {
-          _selectedFamilyId = value;
-          if (value != null) {
-            final selectedArea = _families.firstWhere(
-              (area) => area['id'] == value,
-            );
-            _familyController.text = selectedArea['family_name'] ?? '';
-          } else {
-            _familyController.text = '';
           }
         });
       },

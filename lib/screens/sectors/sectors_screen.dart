@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:csv/csv.dart';
+import 'dart:convert';
+import 'dart:io';
 import '../../utils/app_colors.dart';
 import '../../helpers/db_helper.dart';
 import '../../services/auth_service.dart';
@@ -68,13 +72,27 @@ class _SectorsScreenState extends State<SectorsScreen> {
           foregroundColor: Colors.white,
         ),
         floatingActionButton: AuthService.canEdit()
-            ? FloatingActionButton(
-                onPressed: () async {
-                  await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddEditSectorScreen()));
-                  _loadSectors();
-                },
-                backgroundColor: AppColors.primary,
-                child: const Icon(Icons.add, color: Colors.white),
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FloatingActionButton(
+                    heroTag: "add",
+                    onPressed: () async {
+                      await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddEditSectorScreen()));
+                      _loadSectors();
+                    },
+                    backgroundColor: AppColors.primary,
+                    child: const Icon(Icons.add, color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
+                  FloatingActionButton(
+                    heroTag: "import",
+                    onPressed: () => _showImportDialog(),
+                    backgroundColor: AppColors.secondary,
+                    child: const Icon(Icons.upload_file, color: Colors.white),
+                  ),
+                ],
               )
             : null,
         body: _isLoading
@@ -262,6 +280,172 @@ class _SectorsScreenState extends State<SectorsScreen> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: Text('إلغاء', style: GoogleFonts.cairo())),
             TextButton(onPressed: () { Navigator.pop(context); _deleteSector(id); }, child: Text('حذف', style: GoogleFonts.cairo(color: Colors.red))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _importFromCSV() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+
+      if (result == null) return;
+
+      final file = File(result.files.single.path!);
+      String content;
+      try {
+        content = await file.readAsString(encoding: utf8);
+      } catch (_) {
+        content = await file.readAsString(encoding: latin1);
+      }
+
+      content = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+      final fields = const CsvToListConverter().convert(content);
+
+      if (fields.isEmpty) {
+        _showMessage('الملف فارغ', Colors.red);
+        return;
+      }
+
+      List<List<dynamic>> dataRows = fields;
+
+      // تحقق من الهيدر وتجاهله
+      if (dataRows.isNotEmpty) {
+        final firstRowText = dataRows.first[0].toString().trim();
+        if (firstRowText.contains('اسم') || firstRowText.contains('قطاع')) {
+          if (fields.length > 1) {
+            dataRows = dataRows.skip(1).toList();
+          } else {
+            // Manual line splitting as fallback
+            final lines = content.split('\n').where((line) => line.trim().isNotEmpty).toList();
+            if (lines.length > 1) {
+              dataRows = [];
+              for (int i = 1; i < lines.length; i++) {
+                try {
+                  final row = const CsvToListConverter().convert(lines[i]);
+                  if (row.isNotEmpty) {
+                    dataRows.addAll(row);
+                  }
+                } catch (e) {
+                  final simpleSplit = lines[i].split(',').map((e) => e.trim()).toList();
+                  if (simpleSplit.isNotEmpty && simpleSplit[0].isNotEmpty) {
+                    dataRows.add(simpleSplit);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (dataRows.isEmpty) {
+        _showMessage('لا توجد بيانات للاستيراد', Colors.red);
+        return;
+      }
+
+      int successCount = 0;
+      int errorCount = 0;
+
+      for (var row in dataRows) {
+        if (row.isEmpty || row[0].toString().trim().isEmpty) {
+          errorCount++;
+          continue;
+        }
+
+        try {
+          await _db.insertSector({
+            'sector_name': row[0].toString().trim(),
+            'meeting_time': row.length > 1 && row[1].toString().trim().isNotEmpty
+                ? row[1].toString().trim()
+                : null,
+          });
+          successCount++;
+        } catch (_) {
+          errorCount++;
+        }
+      }
+
+      _loadSectors();
+      _showMessage(
+        'تم استيراد $successCount قطاع بنجاح${errorCount > 0 ? " مع $errorCount خطأ" : ""}',
+        Colors.green,
+      );
+    } catch (e) {
+      _showMessage('فشل في استيراد الملف', Colors.red);
+    }
+  }
+
+  void _showMessage(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.cairo()),
+        backgroundColor: color,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showImportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text(
+            'استيراد بيانات القطاعات',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'تنسيق ملف CSV المطلوب:',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'اسم القطاع, موعد الاجتماع',
+                  style: GoogleFonts.cairo(fontSize: 12),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'ملاحظات:',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.w600),
+              ),
+              Text(
+                '• اسم القطاع مطلوب\n• موعد الاجتماع اختياري',
+                style: GoogleFonts.cairo(fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('إلغاء', style: GoogleFonts.cairo()),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _importFromCSV();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('اختيار ملف', style: GoogleFonts.cairo()),
+            ),
           ],
         ),
       ),

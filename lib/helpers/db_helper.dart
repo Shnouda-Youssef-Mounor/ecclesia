@@ -5,7 +5,6 @@ import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class DatabaseHelper {
@@ -65,48 +64,7 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      // إضافة جدول المناطق
-      await db.execute('''
-        CREATE TABLE areas (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          area_name TEXT NOT NULL,
-          area_description TEXT
-        )
-      ''');
-
-      // إضافة عمود area_id للأفراد
-      await db.execute('ALTER TABLE individuals ADD COLUMN area_id INTEGER');
-
-      // إضافة عمود area_id للأسر
-      await db.execute('ALTER TABLE families ADD COLUMN area_id INTEGER');
-
-      // إضافة بيانات المناطق التجريبية
-      await db.insert('areas', {
-        'area_name': 'مصر الجديدة',
-        'area_description': 'منطقة مصر الجديدة وما حولها',
-      });
-      await db.insert('areas', {
-        'area_name': 'الدقي',
-        'area_description': 'منطقة الدقي والمهندسين',
-      });
-      await db.insert('areas', {
-        'area_name': 'مدينة نصر',
-        'area_description': 'مدينة نصر والمناطق المجاورة',
-      });
-      await db.insert('areas', {
-        'area_name': 'شبرا',
-        'area_description': 'منطقة شبرا وروض الفرج',
-      });
-      await db.insert('areas', {
-        'area_name': 'الزيتون',
-        'area_description': 'منطقة الزيتون وحدائق القبة',
-      });
-    }
-    if (oldVersion < 3) {
-      await db.execute('ALTER TABLE individuals ADD COLUMN job_title TEXT');
-      await db.execute('ALTER TABLE individuals ADD COLUMN work_place TEXT');
-    }
+    if (oldVersion < 2) {}
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -200,19 +158,17 @@ class DatabaseHelper {
         birth_date TEXT,
         gender TEXT,
         marital_status TEXT,
-        spouse_id INTEGER,
         military_status TEXT,
         area_id INTEGER,
-        area TEXT,
+        area TEXT, 
         current_address TEXT,
         phone TEXT,
-        whatsapp TEXT,
-        family_id INTEGER NULL,
+        whatsapp TEXT, 
+        sector_id INTEGER NULL,
         education_stage_id INTEGER,
         education_institution TEXT,
         job_title TEXT, 
         work_place TEXT, 
-        FOREIGN KEY (spouse_id) REFERENCES individuals (id),
         FOREIGN KEY (education_stage_id) REFERENCES education_stages (id),
         FOREIGN KEY (area_id) REFERENCES areas (id)
       )
@@ -340,7 +296,6 @@ class DatabaseHelper {
 
   Future<int> updateChurch(int id, Map<String, dynamic> church) async {
     final db = await database;
-    print(church);
     return await db.update(
       'churches',
       church,
@@ -376,6 +331,81 @@ class DatabaseHelper {
     return await db.query('individuals');
   }
 
+  Future<List<Map<String, dynamic>>> getAllIndividualsWithRelations() async {
+    final db = await database;
+
+    final individuals = await db.rawQuery('''
+      SELECT i.*, es.stage_name as education_stage_name
+      FROM individuals i
+      LEFT JOIN education_stages es ON i.education_stage_id = es.id
+    ''');
+
+    List<Map<String, dynamic>> result = [];
+
+    for (var individual in individuals) {
+      final individualId = individual['id'];
+
+      // جلب الأنشطة
+      final activities = await db.rawQuery(
+        '''
+      SELECT a.id, a.activity_name 
+      FROM activities a
+      INNER JOIN individual_activities ia ON ia.activity_id = a.id
+      WHERE ia.individual_id = ?
+    ''',
+        [individualId],
+      );
+
+      // جلب المساعدات
+      final aids = await db.rawQuery(
+        '''
+      SELECT ad.id, ad.organization_name 
+      FROM aids ad
+      INNER JOIN individual_aids iad ON iad.aid_id = ad.id
+      WHERE iad.individual_id = ?
+    ''',
+        [individualId],
+      );
+
+      // جلب القطاعات
+      final sectors = await db.rawQuery(
+        '''
+      SELECT s.id, s.sector_name 
+      FROM sectors s
+      INNER JOIN individual_sectors isec ON isec.sector_id = s.id
+      WHERE isec.individual_id = ?
+    ''',
+        [individualId],
+      );
+
+      // 🟢 جلب الأسرة اللي الفرد عضو فيها مع دوره
+      final families = await db.rawQuery(
+        '''
+      SELECT f.id, f.family_name, f.family_address,
+             CASE 
+               WHEN f.father_id = ? THEN 'أب'
+               WHEN f.mother_id = ? THEN 'أم'
+               ELSE 'فرد'
+             END as role
+      FROM families f
+      INNER JOIN family_members fm ON fm.family_id = f.id
+      WHERE fm.individual_id = ?
+    ''',
+        [individualId, individualId, individualId],
+      );
+
+      result.add({
+        ...individual,
+        'activities': activities,
+        'aids': aids,
+        'sectors': sectors,
+        'families': families, // 🟢 إضافة العائلة
+      });
+    }
+
+    return result;
+  }
+
   Future<int> updateIndividual(int id, Map<String, dynamic> individual) async {
     final db = await database;
     return await db.update(
@@ -384,6 +414,54 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // حذف كل الأنشطة المرتبطة بفرد
+  Future<int> deleteIndividualActivities(int individualId) async {
+    final db = await database;
+    return await db.delete(
+      'individual_activities',
+      where: 'individual_id = ?',
+      whereArgs: [individualId],
+    );
+  }
+
+  // حذف كل المساعدات المرتبطة بفرد
+  Future<int> deleteIndividualAids(int individualId) async {
+    final db = await database;
+    return await db.delete(
+      'individual_aids',
+      where: 'individual_id = ?',
+      whereArgs: [individualId],
+    );
+  }
+
+  // حذف كل القطاعات المرتبطة بفرد
+  Future<int> deleteIndividualSectors(int individualId) async {
+    final db = await database;
+    return await db.delete(
+      'individual_sectors',
+      where: 'individual_id = ?',
+      whereArgs: [individualId],
+    );
+  }
+
+  // إدراج نشاط مرتبط بفرد
+  Future<int> insertIndividualActivity(Map<String, dynamic> data) async {
+    final db = await database;
+    return await db.insert('individual_activities', data);
+  }
+
+  // إدراج مساعدة مرتبطة بفرد
+  Future<int> insertIndividualAid(Map<String, dynamic> data) async {
+    final db = await database;
+    return await db.insert('individual_aids', data);
+  }
+
+  // إدراج قطاع مرتبط بفرد
+  Future<int> insertIndividualSector(Map<String, dynamic> data) async {
+    final db = await database;
+    return await db.insert('individual_sectors', data);
   }
 
   Future<int> deleteIndividual(int id) async {
@@ -670,87 +748,94 @@ class DatabaseHelper {
     // إعادة إنشاء قاعدة البيانات
     await database;
   }
-  
-Future<String> backupDatabase() async {
-  try {
-    // تحديد مكان قاعدة البيانات الأصلية
-    String originalDbPath;
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      originalDbPath = join(await databaseFactoryFfi.getDatabasesPath(), 'ecclesia.db');
-    } else {
-      originalDbPath = join(await getDatabasesPath(), 'ecclesia.db');
+
+  Future<String> backupDatabase() async {
+    try {
+      // تحديد مكان قاعدة البيانات الأصلية
+      String originalDbPath;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        originalDbPath = join(
+          await databaseFactoryFfi.getDatabasesPath(),
+          'ecclesia.db',
+        );
+      } else {
+        originalDbPath = join(await getDatabasesPath(), 'ecclesia.db');
+      }
+
+      final originalFile = File(originalDbPath);
+
+      // يختار المستخدم مكان حفظ النسخة
+      String? outputDir = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'اختر مكان حفظ النسخة الاحتياطية',
+      );
+
+      if (outputDir == null) {
+        throw Exception('لم يتم اختيار مجلد للنسخ الاحتياطي');
+      }
+
+      // اسم النسخة الاحتياطية
+      final backupPath = join(
+        outputDir,
+        'ecclesia_backup_${DateTime.now().millisecondsSinceEpoch}.db',
+      );
+
+      // نسخ الملف
+      await originalFile.copy(backupPath);
+
+      print('تم النسخ الاحتياطي إلى: $backupPath');
+      return backupPath;
+    } catch (e) {
+      print('فشل في عمل النسخة الاحتياطية: $e');
+      rethrow;
     }
-
-    final originalFile = File(originalDbPath);
-
-    // يختار المستخدم مكان حفظ النسخة
-    String? outputDir = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: 'اختر مكان حفظ النسخة الاحتياطية',
-    );
-
-    if (outputDir == null) {
-      throw Exception('لم يتم اختيار مجلد للنسخ الاحتياطي');
-    }
-
-    // اسم النسخة الاحتياطية
-    final backupPath = join(outputDir, 'ecclesia_backup_${DateTime.now().millisecondsSinceEpoch}.db');
-
-    // نسخ الملف
-    await originalFile.copy(backupPath);
-
-    print('تم النسخ الاحتياطي إلى: $backupPath');
-    return backupPath;
-  } catch (e) {
-    print('فشل في عمل النسخة الاحتياطية: $e');
-    rethrow;
   }
-}
 
+  Future<void> restoreDatabase() async {
+    try {
+      // اختيار ملف النسخة الاحتياطية من المستخدم
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        dialogTitle: 'اختر ملف النسخة الاحتياطية للاستعادة',
+        type: FileType.custom,
+        allowedExtensions: ['db'],
+      );
 
-Future<void> restoreDatabase() async {
-  try {
-    // اختيار ملف النسخة الاحتياطية من المستخدم
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      dialogTitle: 'اختر ملف النسخة الاحتياطية للاستعادة',
-      type: FileType.custom,
-      allowedExtensions: ['db'],
-    );
+      if (result == null || result.files.single.path == null) {
+        throw Exception('لم يتم اختيار أي ملف');
+      }
 
-    if (result == null || result.files.single.path == null) {
-      throw Exception('لم يتم اختيار أي ملف');
+      String backupPath = result.files.single.path!;
+
+      // إغلاق قاعدة البيانات الحالية
+      if (_database != null) {
+        await _database!.close();
+        _database = null;
+      }
+
+      // مسار القاعدة الأصلية
+      String originalDbPath;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        originalDbPath = join(
+          await databaseFactoryFfi.getDatabasesPath(),
+          'ecclesia.db',
+        );
+      } else {
+        originalDbPath = join(await getDatabasesPath(), 'ecclesia.db');
+      }
+
+      final backupFile = File(backupPath);
+      final originalFile = File(originalDbPath);
+
+      if (await backupFile.exists()) {
+        await backupFile.copy(originalFile.path);
+      } else {
+        throw Exception('ملف النسخة الاحتياطية غير موجود!');
+      }
+
+      await database;
+      print('تم استعادة قاعدة البيانات بنجاح');
+    } catch (e) {
+      print('فشل في استعادة قاعدة البيانات: $e');
+      rethrow;
     }
-
-    String backupPath = result.files.single.path!;
-
-    // إغلاق قاعدة البيانات الحالية
-    if (_database != null) {
-      await _database!.close();
-      _database = null;
-    }
-
-    // مسار القاعدة الأصلية
-    String originalDbPath;
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      originalDbPath = join(await databaseFactoryFfi.getDatabasesPath(), 'ecclesia.db');
-    } else {
-      originalDbPath = join(await getDatabasesPath(), 'ecclesia.db');
-    }
-
-    final backupFile = File(backupPath);
-    final originalFile = File(originalDbPath);
-
-    if (await backupFile.exists()) {
-      await backupFile.copy(originalFile.path);
-    } else {
-      throw Exception('ملف النسخة الاحتياطية غير موجود!');
-    }
-
-    await database;
-    print('تم استعادة قاعدة البيانات بنجاح');
-  } catch (e) {
-    print('فشل في استعادة قاعدة البيانات: $e');
-    rethrow;
   }
-}
-
 }

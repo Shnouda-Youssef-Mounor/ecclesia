@@ -7,6 +7,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:file_picker/file_picker.dart';
+import 'package:csv/csv.dart';
+import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 
 import '../../helpers/db_helper.dart';
 import '../../services/auth_service.dart';
@@ -49,7 +53,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
     _areas = await _db.getAllAreas();
     _educationStages = await _db.getAllEducationStages();
     _sectors = await _db.getAllSectors();
-    _individuals = await _db.getAllIndividuals();
+    _individuals = await _db.getAllIndividualsWithRelations();
     _filteredIndividuals = _individuals;
     setState(() => _isLoading = false);
   }
@@ -255,20 +259,16 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                 1: pw.FlexColumnWidth(2),
                 2: pw.FlexColumnWidth(2),
                 3: pw.FlexColumnWidth(2),
-                4: pw.FlexColumnWidth(1),
+                4: pw.FlexColumnWidth(2),
+                5: pw.FlexColumnWidth(2),
+                6: pw.FlexColumnWidth(1),
               },
               children: [
                 // Header row
                 pw.TableRow(
                   decoration: pw.BoxDecoration(color: PdfColors.indigo700),
                   children:
-                      [
-                            'م',
-                            'الاسم الكامل',
-                            'الرقم القومي',
-                            'المحافظة',
-                            'تاريخ الميلاد',
-                          ]
+                      ['م', 'الاسم الكامل', 'الرقم القومي', 'الرقم', 'المنطقة']
                           .map(
                             (h) => pw.Padding(
                               padding: pw.EdgeInsets.all(8),
@@ -293,7 +293,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                   final index = entry.key + 1;
                   final person = entry.value;
                   final isEven = index % 2 == 0;
-
+                  print(person);
                   return pw.TableRow(
                     decoration: pw.BoxDecoration(
                       color: isEven ? PdfColors.grey100 : PdfColors.white,
@@ -325,7 +325,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                       pw.Padding(
                         padding: pw.EdgeInsets.all(6),
                         child: pw.Text(
-                          person['governorate'] ?? '',
+                          person['phone'] ?? '',
                           textAlign: pw.TextAlign.center,
                           style: pw.TextStyle(font: ttf, fontSize: 9),
                         ),
@@ -333,7 +333,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                       pw.Padding(
                         padding: pw.EdgeInsets.all(6),
                         child: pw.Text(
-                          person['birth_date'] ?? '',
+                          person['area'] ?? '',
                           textAlign: pw.TextAlign.center,
                           style: pw.TextStyle(font: ttf, fontSize: 9),
                         ),
@@ -390,6 +390,14 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                 backgroundColor: AppColors.primary,
                 child: const Icon(Icons.add, color: Colors.white),
               ),
+            if (AuthService.canEdit()) const SizedBox(height: 16),
+            if (AuthService.canEdit())
+              FloatingActionButton(
+                heroTag: "import",
+                onPressed: () => _showImportDialog(),
+                backgroundColor: AppColors.secondary,
+                child: const Icon(Icons.upload_file, color: Colors.white),
+              ),
             const SizedBox(height: 16),
             FloatingActionButton(
               heroTag: "print",
@@ -413,15 +421,15 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                   );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'فشل في إنشاء التقرير. يجب التأكد من بيانات الكنيسة من صفحة الإدارة الكنسية.',
-                          style: GoogleFonts.cairo(),
-                        ),
-                        backgroundColor: Colors.red,
-                        duration: const Duration(seconds: 2),
+                    SnackBar(
+                      content: Text(
+                        'فشل في إنشاء التقرير. يجب التأكد من بيانات الكنيسة من صفحة الإدارة الكنسية.',
+                        style: GoogleFonts.cairo(),
                       ),
-                    );
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
                 }
               },
               backgroundColor: AppColors.light,
@@ -527,6 +535,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
       itemCount: _filteredIndividuals.length,
       itemBuilder: (context, index) {
         final individual = _filteredIndividuals[index];
+        print(individual);
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
@@ -853,7 +862,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
                     _buildFilterDropdown(
                       'الحالة الاجتماعية',
                       _selectedMaritalStatus,
-                      ['الكل', 'أعزب', 'متزوج', 'مطلق', 'أرمل'],
+                      ['الكل', 'أعزب', 'متزوجة', 'متزوج', 'مطلق', 'أرمل'],
                       (value) {
                         setState(() => _selectedMaritalStatus = value!);
                         _filterIndividuals();
@@ -1165,6 +1174,344 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
             setState(() => _selectedSector = value!);
             _filterIndividuals();
           },
+        ),
+      ),
+    );
+  }
+
+  Map<String, String?> _extractFromNationalId(String nationalId) {
+    if (nationalId.length != 14) {
+      return {'gender': null, 'birth_date': null, 'governorate': null};
+    }
+
+    try {
+      // استخراج تاريخ الميلاد
+      String century = nationalId[0] == '2' || nationalId[0] == '3'
+          ? '19'
+          : '20';
+      String year = century + nationalId.substring(1, 3);
+      String month = nationalId.substring(3, 5);
+      String day = nationalId.substring(5, 7);
+      String birthDate = '$day/$month/$year';
+
+      // استخراج النوع
+      int genderDigit = int.parse(nationalId[12]);
+      String gender = genderDigit % 2 == 1 ? 'ذكر' : 'أنثى';
+
+      // استخراج المحافظة
+      String governorateCode = nationalId.substring(7, 9);
+      Map<String, String> governorates = {
+        '01': 'القاهرة',
+        '02': 'الإسكندرية',
+        '03': 'بورسعيد',
+        '04': 'السويس',
+        '11': 'دمياط',
+        '12': 'الدقهلية',
+        '13': 'الشرقية',
+        '14': 'القليوبية',
+        '15': 'كفر الشيخ',
+        '16': 'الغربية',
+        '17': 'المنوفية',
+        '18': 'البحيرة',
+        '19': 'الإسماعيلية',
+        '21': 'الجيزة',
+        '22': 'بني سويف',
+        '23': 'الفيوم',
+        '24': 'المنيا',
+        '25': 'أسيوط',
+        '26': 'سوهاج',
+        '27': 'قنا',
+        '28': 'أسوان',
+        '29': 'الأقصر',
+        '31': 'البحر الأحمر',
+        '32': 'الوادي الجديد',
+        '33': 'مطروح',
+        '34': 'شمال سيناء',
+        '35': 'جنوب سيناء',
+      };
+      String? governorate = governorates[governorateCode];
+
+      return {
+        'gender': gender,
+        'birth_date': birthDate,
+        'governorate': governorate,
+      };
+    } catch (e) {
+      return {'gender': null, 'birth_date': null, 'governorate': null};
+    }
+  }
+
+  Future<void> _importFromCSV() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+
+      if (result == null) return;
+
+      final file = File(result.files.single.path!);
+
+      // قراءة الملف مع التعامل مع الترميز
+      String content;
+      try {
+        content = await file.readAsString(encoding: utf8);
+      } catch (_) {
+        content = await file.readAsString(encoding: latin1);
+      }
+
+      // تصحيح نهاية السطور
+      content = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+      // تحويل CSV إلى List
+      final fields = const CsvToListConverter().convert(content);
+
+      if (fields.isEmpty) {
+        _showMessage('الملف فارغ', Colors.red);
+        return;
+      }
+
+      // التحقق من وجود رأس الجدول
+      List<List<dynamic>> dataRows = fields;
+
+      if (fields.isNotEmpty) {
+        final firstRow = fields.first.map((e) => e.toString().trim()).toList();
+        // Check if first row contains Arabic headers or common header terms
+        bool isHeader = firstRow.any((cell) {
+          final cellText = cell.toString();
+          return cellText.contains('الاسم') ||
+              cellText.contains('اسم') ||
+              cellText.contains('رقم') ||
+              cellText.contains('هاتف') ||
+              cellText.contains('عنوان') ||
+              cellText.toLowerCase().contains('timestamp') ||
+              cellText.toLowerCase().contains('name');
+        });
+
+        if (isHeader) {
+          if (fields.length > 1) {
+            dataRows = fields.skip(1).toList();
+          } else {
+            // Manual line splitting as fallback
+            final lines = content
+                .split('\n')
+                .where((line) => line.trim().isNotEmpty)
+                .toList();
+            if (lines.length > 1) {
+              dataRows = [];
+              for (int i = 1; i < lines.length; i++) {
+                try {
+                  final row = const CsvToListConverter().convert(lines[i]);
+                  if (row.isNotEmpty) {
+                    dataRows.addAll(row);
+                  }
+                } catch (e) {
+                  final simpleSplit = lines[i]
+                      .split(',')
+                      .map((e) => e.trim())
+                      .toList();
+                  if (simpleSplit.isNotEmpty && simpleSplit[0].isNotEmpty) {
+                    dataRows.add(simpleSplit);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (dataRows.isEmpty) {
+        _showMessage('لا توجد بيانات للاستيراد', Colors.red);
+        return;
+      }
+
+      int successCount = 0;
+      int errorCount = 0;
+
+      for (int i = 0; i < dataRows.length; i++) {
+        var row = dataRows[i];
+        try {
+          // Skip Timestamp column if it exists
+          int startIndex = 0;
+          if (fields.isNotEmpty && fields.first.isNotEmpty) {
+            final headerRow = fields.first;
+            if (headerRow[0].toString().toLowerCase().contains('timestamp')) {
+              startIndex = 1;
+            }
+          }
+
+          if (row.length >= startIndex + 3 &&
+              row[startIndex].toString().trim().isNotEmpty) {
+            // Find area, sector, and education stage IDs
+            int? areaId;
+            int? sectorId;
+            int? educationStageId;
+
+            String areaName = row.length > startIndex + 5
+                ? row[startIndex + 5].toString().trim()
+                : '';
+            String sectorName = row.length > startIndex + 8
+                ? row[startIndex + 8].toString().trim()
+                : '';
+            String educationStageName = row.length > startIndex + 9
+                ? row[startIndex + 9].toString().trim()
+                : '';
+
+            if (areaName.isNotEmpty) {
+              final area = _areas
+                  .where((a) => a['area_name'] == areaName)
+                  .firstOrNull;
+              if (area != null) areaId = area['id'] as int;
+            }
+
+            if (sectorName.isNotEmpty) {
+              final sector = _sectors
+                  .where((s) => s['sector_name'] == sectorName)
+                  .firstOrNull;
+              if (sector != null) sectorId = sector['id'] as int;
+            }
+
+            if (educationStageName.isNotEmpty) {
+              final stage = _educationStages
+                  .where((s) => s['stage_name'] == educationStageName)
+                  .firstOrNull;
+              if (stage != null) educationStageId = stage['id'] as int;
+            }
+
+            String nationalId = row.length > startIndex + 2
+                ? row[startIndex + 2].toString().trim()
+                : '';
+
+            // استخراج البيانات من الرقم القومي
+            Map<String, String?> extractedData = _extractFromNationalId(
+              nationalId,
+            );
+
+            await _db.insertIndividual({
+              'full_name':
+                  '${row[startIndex].toString().trim()} ${row.length > startIndex + 1 ? row[startIndex + 1].toString().trim() : ''}',
+              'national_id': nationalId,
+              'phone': row.length > startIndex + 3
+                  ? row[startIndex + 3].toString().trim()
+                  : '',
+              'gender': extractedData['gender'],
+              'birth_date': extractedData['birth_date'],
+              'governorate': extractedData['governorate'],
+              'whatsapp': row.length > startIndex + 4
+                  ? row[startIndex + 4].toString().trim()
+                  : null,
+              'area_id': areaId,
+              'area': areaName.isNotEmpty ? areaName : null,
+              'current_address': row.length > startIndex + 6
+                  ? row[startIndex + 6].toString().trim()
+                  : '',
+              'marital_status': row.length > startIndex + 7
+                  ? row[startIndex + 7].toString().trim()
+                  : 'أعزب',
+              'sector_id': sectorId,
+              'education_stage_id': educationStageId,
+              'education_institution': row.length > startIndex + 10
+                  ? row[startIndex + 10].toString().trim()
+                  : null,
+              'job_title': row.length > startIndex + 11
+                  ? row[startIndex + 11].toString().trim()
+                  : null,
+              'work_place': row.length > startIndex + 12
+                  ? row[startIndex + 12].toString().trim()
+                  : null,
+            });
+
+            successCount++;
+          } else {
+            print("Skipping row $i: insufficient data or empty name");
+            errorCount++;
+          }
+        } catch (e) {
+          print("Error inserting row $i: $e");
+          errorCount++;
+        }
+      }
+
+      _loadData();
+
+      _showMessage(
+        'تم استيراد $successCount فرد بنجاح${errorCount > 0 ? " مع $errorCount خطأ" : ""}',
+        Colors.green,
+      );
+    } catch (e) {
+      print("IMPORT ERROR: $e");
+      _showMessage('فشل في استيراد الملف', Colors.red);
+    }
+  }
+
+  void _showMessage(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.cairo()),
+        backgroundColor: color,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showImportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: ui.TextDirection.rtl,
+        child: AlertDialog(
+          title: Text(
+            'استيراد بيانات الأفراد',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'تنسيق ملف CSV المطلوب:',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'الاسم الكامل, الرقم القومي, الهاتف, العنوان الحالي, النوع, الحالة الاجتماعية, تاريخ الميلاد, المحافظة',
+                  style: GoogleFonts.cairo(fontSize: 12),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'ملاحظات:',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.w600),
+              ),
+              Text(
+                '• الحقول الأربعة الأولى مطلوبة\n• النوع: ذكر أو أنثى\n• الحالة الاجتماعية: أعزب، متزوج، مطلق، أرمل',
+                style: GoogleFonts.cairo(fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('إلغاء', style: GoogleFonts.cairo()),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _importFromCSV();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('اختيار ملف', style: GoogleFonts.cairo()),
+            ),
+          ],
         ),
       ),
     );
