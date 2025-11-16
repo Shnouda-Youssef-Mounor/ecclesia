@@ -1,9 +1,9 @@
-import 'package:ecclesia/helpers/db_helper.dart';
 import 'package:ecclesia/utils/app_footer.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../utils/app_colors.dart';
+
 import '../../services/auth_service.dart';
+import '../../utils/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -118,7 +118,9 @@ class _LoginScreenState extends State<LoginScreen>
                         maxWidth: isDesktop ? 500 : double.infinity,
                         minHeight: screenHeight * 0.6,
                       ),
-                      child: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
+                      child: isDesktop
+                          ? _buildDesktopLayout()
+                          : _buildMobileLayout(),
                     ),
                   ),
                 ),
@@ -135,9 +137,7 @@ class _LoginScreenState extends State<LoginScreen>
     return Card(
       elevation: 20,
       shadowColor: AppColors.primary.withOpacity(0.3),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Container(
         padding: const EdgeInsets.all(48),
         decoration: BoxDecoration(
@@ -145,10 +145,7 @@ class _LoginScreenState extends State<LoginScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Colors.white,
-              AppColors.light.withOpacity(0.5),
-            ],
+            colors: [Colors.white, AppColors.light.withOpacity(0.5)],
           ),
         ),
         child: Column(
@@ -186,10 +183,7 @@ class _LoginScreenState extends State<LoginScreen>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Colors.white,
-                  AppColors.light.withOpacity(0.3),
-                ],
+                colors: [Colors.white, AppColors.light.withOpacity(0.3)],
               ),
             ),
             child: _buildLoginForm(),
@@ -285,10 +279,7 @@ class _LoginScreenState extends State<LoginScreen>
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
-          colors: [
-            AppColors.primary,
-            AppColors.primary.withOpacity(0.8),
-          ],
+          colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
         ),
         boxShadow: [
           BoxShadow(
@@ -341,9 +332,7 @@ class _LoginScreenState extends State<LoginScreen>
       decoration: BoxDecoration(
         color: AppColors.accent.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.accent.withOpacity(0.3),
-        ),
+        border: Border.all(color: AppColors.accent.withOpacity(0.3)),
       ),
       child: Column(
         children: [
@@ -366,40 +355,90 @@ class _LoginScreenState extends State<LoginScreen>
             ],
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                'المستخدم: ',
-                style: GoogleFonts.cairo(
-                  fontSize: 13,
-                  color: AppColors.secondary,
-                ),
-              ),
-              Text(
-                'admin',
-                style: GoogleFonts.cairo(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                'كلمة المرور: ',
-                style: GoogleFonts.cairo(
-                  fontSize: 13,
-                  color: AppColors.secondary,
-                ),
-              ),
-              Text(
-                'admin123',
-                style: GoogleFonts.cairo(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 300) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'المستخدم: ',
+                          style: GoogleFonts.cairo(
+                            fontSize: 13,
+                            color: AppColors.secondary,
+                          ),
+                        ),
+                        Text(
+                          'admin',
+                          style: GoogleFonts.cairo(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          'كلمة المرور: ',
+                          style: GoogleFonts.cairo(
+                            fontSize: 13,
+                            color: AppColors.secondary,
+                          ),
+                        ),
+                        Text(
+                          'admin123',
+                          style: GoogleFonts.cairo(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Text(
+                    'المستخدم: ',
+                    style: GoogleFonts.cairo(
+                      fontSize: 13,
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                  Text(
+                    'admin',
+                    style: GoogleFonts.cairo(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'كلمة المرور: ',
+                    style: GoogleFonts.cairo(
+                      fontSize: 13,
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                  Text(
+                    'admin123',
+                    style: GoogleFonts.cairo(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -426,10 +465,7 @@ class _LoginScreenState extends State<LoginScreen>
       child: TextField(
         controller: controller,
         obscureText: isPassword,
-        style: GoogleFonts.cairo(
-          fontSize: 16,
-          color: Colors.black87,
-        ),
+        style: GoogleFonts.cairo(fontSize: 16, color: Colors.black87),
         decoration: InputDecoration(
           prefixIcon: Container(
             margin: const EdgeInsets.all(8),
@@ -437,11 +473,7 @@ class _LoginScreenState extends State<LoginScreen>
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: AppColors.primary,
-              size: 22,
-            ),
+            child: Icon(icon, color: AppColors.primary, size: 22),
           ),
           labelText: label,
           labelStyle: GoogleFonts.cairo(
@@ -452,22 +484,15 @@ class _LoginScreenState extends State<LoginScreen>
           fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: AppColors.accent.withOpacity(0.3),
-            ),
+            borderSide: BorderSide(color: AppColors.accent.withOpacity(0.3)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: AppColors.accent.withOpacity(0.3),
-            ),
+            borderSide: BorderSide(color: AppColors.accent.withOpacity(0.3)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: AppColors.primary,
-              width: 2,
-            ),
+            borderSide: BorderSide(color: AppColors.primary, width: 2),
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 20,
