@@ -20,6 +20,18 @@ class _SettingsPageState extends State<SettingsPage> {
   String? lastBackupDate = CacheHelper.getString('last_backup_date');
 
   @override
+  void initState() {
+    super.initState();
+    _loadLastBackupDate();
+  }
+
+  void _loadLastBackupDate() {
+    setState(() {
+      lastBackupDate = CacheHelper.getString('last_backup_date');
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -218,12 +230,12 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
   String _formatBackupDate(String? isoDate) {
-  if (isoDate == null) return 'لا يوجد';
-  try {
-    DateTime date = DateTime.parse(isoDate);
-    return DateFormat ('d MMMM yyyy - hh:mm a', 'ar').format(date);
-  } catch (e) {
-    return 'تنسيق غير معروف';
+    if (isoDate == null || isoDate.isEmpty) return 'غير معروف';
+    try {
+      DateTime date = DateTime.parse(isoDate);
+      return DateFormat('dd/MM/yyyy - HH:mm').format(date);
+    } catch (e) {
+      return 'غير معروف';
+    }
   }
-}
 }

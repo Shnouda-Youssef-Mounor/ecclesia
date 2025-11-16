@@ -39,7 +39,7 @@ class _IndividualDetailsScreenState extends State<IndividualDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('Individual data: ${widget.individual}'); // Debug
+    print('Individual data: ${widget.individual}');
     final isDesktop = MediaQuery.of(context).size.width > 800;
 
     return Directionality(
@@ -137,7 +137,6 @@ class _IndividualDetailsScreenState extends State<IndividualDetailsScreen> {
     ];
 
     if (!isDesktop) {
-      // 📱 موبايل → كروت عمودية بعرض الشاشة كله
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: fields
@@ -150,7 +149,6 @@ class _IndividualDetailsScreenState extends State<IndividualDetailsScreen> {
             .toList(),
       );
     } else {
-      // 💻 ديسكتوب → صفوف فيها عمودين جنب بعض
       return Column(
         children: [
           for (int i = 0; i < fields.length; i += 2)
@@ -238,6 +236,8 @@ class _IndividualDetailsScreenState extends State<IndividualDetailsScreen> {
               display = item['activity_name'];
             } else if (item is Map && item.containsKey('aid_name')) {
               display = item['aid_name'];
+            } else if (item is Map && item.containsKey('organization_name')) {
+              display = item['organization_name'];
             } else if (item is Map && item.containsKey('family_name')) {
               display = '${item['family_name']} (${item['role'] ?? 'فرد'})';
             } else {

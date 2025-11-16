@@ -1,16 +1,15 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:csv/csv.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:file_picker/file_picker.dart';
-import 'package:csv/csv.dart';
-import 'dart:convert';
-import 'package:path_provider/path_provider.dart';
 
 import '../../helpers/db_helper.dart';
 import '../../services/auth_service.dart';
@@ -65,7 +64,7 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
   }
 
   Future<void> _loadIndividuals() async {
-    _individuals = await _db.getAllIndividuals();
+    _individuals = await _db.getAllIndividualsWithRelations();
     _filteredIndividuals = _individuals;
     _filterIndividuals();
   }
@@ -256,12 +255,10 @@ class _IndividualsScreenState extends State<IndividualsScreen> {
               border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
               columnWidths: {
                 0: pw.FlexColumnWidth(2),
-                1: pw.FlexColumnWidth(2),
-                2: pw.FlexColumnWidth(2),
+                1: pw.FlexColumnWidth(3),
+                2: pw.FlexColumnWidth(2.5),
                 3: pw.FlexColumnWidth(2),
-                4: pw.FlexColumnWidth(2),
-                5: pw.FlexColumnWidth(2),
-                6: pw.FlexColumnWidth(1),
+                4: pw.FlexColumnWidth(0.5),
               },
               children: [
                 // Header row

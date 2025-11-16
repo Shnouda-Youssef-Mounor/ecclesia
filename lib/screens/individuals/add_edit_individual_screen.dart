@@ -93,7 +93,7 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
     });
   }
 
-  void _loadIndividualData() {
+  void _loadIndividualData() async {
     final individual = widget.individual!;
     _nameController.text = individual['full_name'] ?? '';
     _nationalIdController.text = individual['national_id'] ?? '';
@@ -111,9 +111,33 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
     _gender = individual['gender'];
     _workController.text = individual['job_title'] ?? '';
     _workAddressController.text = individual['work_place'] ?? '';
-    _selectedActivityIds = List<int>.from(individual['activity_ids'] ?? []);
-    _selectedAidIds = List<int>.from(individual['aid_ids'] ?? []);
-    _selectedSectorIds = List<int>.from(individual['sector_ids'] ?? []);
+    
+    // تحميل العلاقات من قاعدة البيانات
+    await _loadIndividualRelations(individual['id']);
+  }
+  
+  Future<void> _loadIndividualRelations(int individualId) async {
+    final db = await _db.database;
+    
+    // تحميل الأنشطة
+    final activities = await db.rawQuery('''
+      SELECT activity_id FROM individual_activities WHERE individual_id = ?
+    ''', [individualId]);
+    _selectedActivityIds = activities.map((e) => e['activity_id'] as int).toList();
+    
+    // تحميل المساعدات
+    final aids = await db.rawQuery('''
+      SELECT aid_id FROM individual_aids WHERE individual_id = ?
+    ''', [individualId]);
+    _selectedAidIds = aids.map((e) => e['aid_id'] as int).toList();
+    
+    // تحميل القطاعات
+    final sectors = await db.rawQuery('''
+      SELECT sector_id FROM individual_sectors WHERE individual_id = ?
+    ''', [individualId]);
+    _selectedSectorIds = sectors.map((e) => e['sector_id'] as int).toList();
+    
+    setState(() {}); // تحديث الواجهة
   }
 
   void _parseNationalId() {
@@ -331,7 +355,7 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
           .map(
             (e) => MultiSelectItem<int>(
               e['id'] as int,
-              e['activity_name'] as String,
+              e['activity_name']?.toString() ?? 'غير محدد',
             ),
           )
           .toList(),
@@ -348,8 +372,10 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
     return MultiSelectDialogField<int>(
       items: _aids
           .map(
-            (e) =>
-                MultiSelectItem<int>(e['id'] as int, e['aid_name'] as String),
+            (e) => MultiSelectItem<int>(
+              e['id'] as int, 
+              e['organization_name']?.toString() ?? 'غير محدد'
+            ),
           )
           .toList(),
       title: const Text("المساعدات"),
@@ -367,7 +393,7 @@ class _AddEditIndividualScreenState extends State<AddEditIndividualScreen> {
           .map(
             (e) => MultiSelectItem<int>(
               e['id'] as int,
-              e['sector_name'] as String,
+              e['sector_name']?.toString() ?? 'غير محدد',
             ),
           )
           .toList(),

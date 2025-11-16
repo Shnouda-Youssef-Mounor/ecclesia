@@ -68,7 +68,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Ecclesia',
+      title: 'اكليسيا',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: MaterialColor(0xFF1A2A80, {
@@ -144,84 +144,101 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context, Map<String, dynamic>? user) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: DatabaseHelper().getAllChurches(),
+      builder: (context, snapshot) {
+        final church = snapshot.data?.isNotEmpty == true
+            ? snapshot.data!.first
+            : null;
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.primary, AppColors.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            child: const Icon(Icons.church, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'نظام إدارة الكنيسة',
-                  style: GoogleFonts.cairo(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                Text(
-                  'Ecclesia Management System',
-                  style: GoogleFonts.cairo(
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (AuthService.isAdmin())
-            Container(
-              margin: const EdgeInsets.only(left: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
-              child: IconButton(
-                onPressed: () => _showResetDialog(context),
-                icon: const Icon(Icons.refresh, color: Colors.white),
-                tooltip: 'إعادة تعيين قاعدة البيانات',
-              ),
-            ),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              onPressed: () async {
-                await AuthService.logout();
-                Navigator.pushReplacementNamed(context, '/login');
-              },
-              icon: const Icon(Icons.logout, color: Colors.white),
-              tooltip: 'تسجيل الخروج',
-            ),
+            ],
           ),
-        ],
-      ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child:
+                    church?['church_logo'] != null &&
+                        church!['church_logo'].toString().isNotEmpty &&
+                        File(church['church_logo']).existsSync()
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(church['church_logo']),
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : const Icon(Icons.church, color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      church?['church_name'] ?? 'نظام إدارة الكنيسة',
+                      style: GoogleFonts.cairo(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              /*if (AuthService.isAdmin())
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: IconButton(
+                    onPressed: () => _showResetDialog(context),
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    tooltip: 'إعادة تعيين قاعدة البيانات',
+                  ),
+                ),*/
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  onPressed: () async {
+                    await AuthService.logout();
+                    Navigator.pushReplacementNamed(context, '/login');
+                  },
+                  icon: const Icon(Icons.logout, color: Colors.white),
+                  tooltip: 'تسجيل الخروج',
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

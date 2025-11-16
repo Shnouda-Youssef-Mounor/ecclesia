@@ -466,6 +466,14 @@ class DatabaseHelper {
 
   Future<int> deleteIndividual(int id) async {
     final db = await database;
+    // حذف جميع العلاقات أولاً
+    await db.delete('individual_activities', where: 'individual_id = ?', whereArgs: [id]);
+    await db.delete('individual_aids', where: 'individual_id = ?', whereArgs: [id]);
+    await db.delete('individual_sectors', where: 'individual_id = ?', whereArgs: [id]);
+    await db.delete('family_members', where: 'individual_id = ?', whereArgs: [id]);
+    await db.delete('children', where: 'parent_id = ? OR child_id = ?', whereArgs: [id, id]);
+    await db.delete('servants', where: 'individual_id = ?', whereArgs: [id]);
+    // حذف الفرد نفسه
     return await db.delete('individuals', where: 'id = ?', whereArgs: [id]);
   }
 
@@ -558,6 +566,9 @@ class DatabaseHelper {
 
   Future<int> deleteFamily(int id) async {
     final db = await database;
+    // حذف العلاقات أولاً
+    await db.delete('family_members', where: 'family_id = ?', whereArgs: [id]);
+    // حذف العائلة نفسها
     return await db.delete('families', where: 'id = ?', whereArgs: [id]);
   }
 
@@ -568,6 +579,11 @@ class DatabaseHelper {
 
   Future<int> deleteSector(int id) async {
     final db = await database;
+    // حذف العلاقات أولاً
+    await db.delete('individual_sectors', where: 'sector_id = ?', whereArgs: [id]);
+    await db.delete('servants', where: 'sector_id = ?', whereArgs: [id]);
+    await db.delete('priests', where: 'sector_id = ?', whereArgs: [id]);
+    // حذف القطاع نفسه
     return await db.delete('sectors', where: 'id = ?', whereArgs: [id]);
   }
 
@@ -583,6 +599,9 @@ class DatabaseHelper {
 
   Future<int> deleteEducationStage(int id) async {
     final db = await database;
+    // تحديث الأفراد لإزالة المرجع للمرحلة التعليمية
+    await db.update('individuals', {'education_stage_id': null}, where: 'education_stage_id = ?', whereArgs: [id]);
+    // حذف المرحلة التعليمية نفسها
     return await db.delete(
       'education_stages',
       where: 'id = ?',
@@ -622,6 +641,9 @@ class DatabaseHelper {
 
   Future<int> deleteAid(int id) async {
     final db = await database;
+    // حذف العلاقات أولاً
+    await db.delete('individual_aids', where: 'aid_id = ?', whereArgs: [id]);
+    // حذف المساعدة نفسها
     return await db.delete('aids', where: 'id = ?', whereArgs: [id]);
   }
 
@@ -637,6 +659,9 @@ class DatabaseHelper {
 
   Future<int> deleteActivity(int id) async {
     final db = await database;
+    // حذف العلاقات أولاً
+    await db.delete('individual_activities', where: 'activity_id = ?', whereArgs: [id]);
+    // حذف النشاط نفسه
     return await db.delete('activities', where: 'id = ?', whereArgs: [id]);
   }
 
@@ -658,6 +683,10 @@ class DatabaseHelper {
 
   Future<int> deleteArea(int id) async {
     final db = await database;
+    // تحديث الأفراد والعائلات لإزالة المرجع للمنطقة
+    await db.update('individuals', {'area_id': null}, where: 'area_id = ?', whereArgs: [id]);
+    await db.update('families', {'area_id': null}, where: 'area_id = ?', whereArgs: [id]);
+    // حذف المنطقة نفسها
     return await db.delete('areas', where: 'id = ?', whereArgs: [id]);
   }
 
