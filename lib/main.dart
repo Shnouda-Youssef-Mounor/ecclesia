@@ -130,6 +130,20 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         _buildWelcomeCard(user),
                         const SizedBox(height: 24),
+                        OutlinedButton.icon(
+                          onPressed: () {},
+                          style: ButtonStyle(
+                            foregroundColor: WidgetStatePropertyAll(
+                              AppColors.primary,
+                            ),
+                          ),
+                          icon: Icon(Icons.inventory, color: AppColors.primary),
+                          label: Text(
+                            "المخزون",
+                            style: TextStyle(color: AppColors.primary),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
                         _buildMenuGrid(context, isDesktop),
                       ],
                     ),
