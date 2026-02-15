@@ -1129,12 +1129,13 @@ class DatabaseHelper {
       await _database!.close();
       _database = null;
     }
-
+    final db = await database;
+    await _onUpgrade(db, 2, 4);
     // حذف ملف قاعدة البيانات
-    await deleteDatabaseFile();
+    //await deleteDatabaseFile();
 
     // إعادة إنشاء قاعدة البيانات
-    await database;
+    //await database;
   }
 
   Future<String> backupDatabase() async {
@@ -2599,77 +2600,6 @@ class DatabaseHelper {
     }
 
     if (oldVersion < 4) {
-      // إنشاء جداول المخزون الجديدة
-      await db.execute('''
-      CREATE TABLE box_types (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type_name TEXT NOT NULL,
-        description TEXT,
-        is_active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
-
-      await db.execute('''
-      CREATE TABLE inventory_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        item_name TEXT NOT NULL,
-        category TEXT CHECK(category IN ('طعام', 'ملابس', 'أدوات', 'طقسي', 'تعليمي', 'صحي', 'أخرى')),
-        unit TEXT NOT NULL,
-        min_quantity INTEGER DEFAULT 0,
-        current_quantity INTEGER DEFAULT 0,
-                storage_unit INTEGER DEFAULT 0,
-        location TEXT,
-        notes TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
-
-      await db.execute('''
-      CREATE TABLE box_type_contents (
-        box_type_id INTEGER,
-        item_id INTEGER,
-        quantity INTEGER NOT NULL,
-        PRIMARY KEY (box_type_id, item_id),
-        FOREIGN KEY (box_type_id) REFERENCES box_types (id),
-        FOREIGN KEY (item_id) REFERENCES inventory_items (id)
-      )
-    ''');
-
-      await db.execute('''
-      CREATE TABLE boxes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        box_number TEXT UNIQUE NOT NULL,
-        box_type_id INTEGER NOT NULL,
-        status TEXT CHECK(status IN ('جاهز', 'مستلم', 'تالف', 'مفقود')) DEFAULT 'جاهز',
-        prepared_by TEXT,
-        prepared_date TEXT,
-        distributed_to TEXT,
-        distributed_date TEXT,
-        qr_code TEXT,
-        notes TEXT,
-        FOREIGN KEY (box_type_id) REFERENCES box_types (id)
-      )
-    ''');
-
-      await db.execute('''
-      CREATE TABLE inventory_transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        transaction_type TEXT CHECK(transaction_type IN ('دخول', 'خروج', 'تجهيز', 'تعديل', 'تلف')),
-        item_id INTEGER,
-        quantity_change INTEGER NOT NULL,
-        box_id INTEGER,
-        related_entity_type TEXT CHECK(related_entity_type IN ('تبرع', 'خدمة', 'إغاثة', 'عائلة', 'فرد', 'أخرى')),
-        related_entity_id INTEGER,
-        notes TEXT,
-        performed_by TEXT,
-        transaction_date TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (item_id) REFERENCES inventory_items (id),
-        FOREIGN KEY (box_id) REFERENCES boxes (id)
-      )
-    ''');
-
       // إضافة أعمدة جديدة لجدول aids
       await db.execute(
         'ALTER TABLE aids ADD COLUMN is_material_aid INTEGER DEFAULT 0',

@@ -1,4 +1,5 @@
 import 'package:ecclesia/helpers/db_helper.dart';
+import 'package:ecclesia/screens/aids/add_edit_aid_screen.dart';
 import 'package:ecclesia/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 
@@ -817,12 +818,15 @@ class BoxTypeDetailsScreen extends StatefulWidget {
 class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
   List<Map<String, dynamic>> contents = [];
   List<Map<String, dynamic>> allItems = [];
+  List<Map<String, dynamic>> linkedAids = [];
   bool isLoading = true;
+  bool isLoadingAids = true;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadLinkedAids();
   }
 
   Future<void> _loadData() async {
@@ -842,6 +846,56 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
     } finally {
       setState(() => isLoading = false);
     }
+  }
+
+  Future<void> _loadLinkedAids() async {
+    setState(() => isLoadingAids = true);
+    try {
+      final dbHelper = DatabaseHelper();
+      // ملاحظة: هذا يفترض أنك تريد عرض المساعدات المرتبطة بهذا النوع من الكرتون
+      // قد تحتاج إلى تعديل هذا حسب منطق عملك
+      linkedAids = await dbHelper.rawQuery(
+        '''
+        SELECT 
+          a.*,
+          ab.distribution_date as linked_date,
+          COUNT(ab.box_id) as boxes_count
+        FROM aids a
+        LEFT JOIN aid_boxes ab ON a.id = ab.aid_id
+        LEFT JOIN boxes b ON ab.box_id = b.id
+        WHERE b.box_type_id = ? OR a.box_type_id = ?
+        GROUP BY a.id
+        ORDER BY ab.distribution_date DESC
+      ''',
+        [widget.boxType['id'], widget.boxType['id']],
+      );
+    } catch (e) {
+      print('خطأ في تحميل المساعدات المرتبطة: $e');
+    } finally {
+      setState(() => isLoadingAids = false);
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  Color _getCategoryColor(String? category) {
+    final colors = {
+      'طعام': const Color(0xFF2ECC71),
+      'ملابس': const Color(0xFF3498DB),
+      'أدوات': const Color(0xFF9B59B6),
+      'طقسي': const Color(0xFFE74C3C),
+      'تعليمي': const Color(0xFFF39C12),
+      'صحي': const Color(0xFF1ABC9C),
+    };
+    return colors[category] ?? AppColors.primary;
   }
 
   @override
@@ -922,6 +976,7 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
                     Icons.inventory_2_rounded,
                   ),
                 ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: _buildDetailStat(
                     'إجمالي القطع',
@@ -932,6 +987,53 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
               ],
             ),
           ),
+
+          // 🔥 قسم المساعدات المرتبطة (الجديد)
+          if (!isLoadingAids && linkedAids.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.volunteer_activism_rounded,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'المساعدات المرتبطة',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${linkedAids.length} مساعدة',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...linkedAids.map((aid) => _buildAidCard(aid)).toList(),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ],
 
           // Contents List
           Expanded(
@@ -945,6 +1047,160 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
                 : _buildContentsList(),
           ),
         ],
+      ),
+    );
+  }
+
+  // 🔥 كرت المساعدة المرتبطة
+  Widget _buildAidCard(Map<String, dynamic> aid) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            // انتقل إلى تفاصيل المساعدة
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddEditAidScreen(aid: aid),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    color:
+                        (aid['is_material_aid'] == 1
+                                ? Colors.green
+                                : Colors.orange)
+                            .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    aid['is_material_aid'] == 1
+                        ? Icons.inventory_2_rounded
+                        : Icons.attach_money_rounded,
+                    color: aid['is_material_aid'] == 1
+                        ? Colors.green
+                        : Colors.orange,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        aid['organization_name'] ?? 'بدون اسم',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              aid['aid_type'] ?? 'غير محدد',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (aid['boxes_count'] != null) ...[
+                            Icon(
+                              Icons.inbox_rounded,
+                              size: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${aid['boxes_count']} كرتون',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (aid['quantity_provided'] != null &&
+                    aid['quantity_needed'] != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          (aid['quantity_provided'] >= aid['quantity_needed'])
+                          ? Colors.green.withOpacity(0.1)
+                          : Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          '${aid['quantity_provided']}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color:
+                                (aid['quantity_provided'] >=
+                                    aid['quantity_needed'])
+                                ? Colors.green
+                                : Colors.orange,
+                          ),
+                        ),
+                        Text(
+                          'من ${aid['quantity_needed']}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1212,20 +1468,8 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
     );
   }
 
-  Color _getCategoryColor(String? category) {
-    final colors = {
-      'طعام': const Color(0xFF2ECC71),
-      'ملابس': const Color(0xFF3498DB),
-      'أدوات': const Color(0xFF9B59B6),
-      'طقسي': const Color(0xFFE74C3C),
-      'تعليمي': const Color(0xFFF39C12),
-      'صحي': const Color(0xFF1ABC9C),
-    };
-    return colors[category] ?? AppColors.primary;
-  }
-
   void _showAddItemDialog() {
-    final existingItemIds = contents.map((c) => c['id']).toList();
+    final existingItemIds = contents.map((c) => c['item_id']).toList();
     final availableItems = allItems
         .where((item) => !existingItemIds.contains(item['id']))
         .toList();
@@ -1349,33 +1593,6 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline_rounded,
-                              color: AppColors.primary,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '${selectedItem!['notes']}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                     const SizedBox(height: 24),
                     Row(
@@ -1446,11 +1663,10 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
     );
   }
 
-  void _showEditQuantityDialog(Map<dynamic, dynamic> item) {
+  void _showEditQuantityDialog(Map<String, dynamic> item) {
     final quantityController = TextEditingController(
       text: item['quantity'].toString(),
     );
-    print(item);
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -1481,9 +1697,9 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'تعديل الكمية',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1566,7 +1782,7 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
                           final quantity =
                               int.tryParse(quantityController.text) ?? 0;
                           if (quantity <= 0) return;
-                          print("item: $item");
+
                           final dbHelper = DatabaseHelper();
                           await dbHelper.updateBoxTypeItem(
                             widget.boxType['id'],
@@ -1659,7 +1875,7 @@ class _BoxTypeDetailsScreenState extends State<BoxTypeDetailsScreen> {
                         final dbHelper = DatabaseHelper();
                         await dbHelper.removeItemFromBoxType(
                           widget.boxType['id'],
-                          item['id'],
+                          item['item_id'],
                         );
                         Navigator.pop(context);
                         _loadData();

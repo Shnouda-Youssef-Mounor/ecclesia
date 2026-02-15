@@ -210,7 +210,7 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              /*if (AuthService.isAdmin())
+              if (AuthService.isAdmin())
                 Container(
                   margin: const EdgeInsets.only(left: 8),
                   decoration: BoxDecoration(
@@ -222,7 +222,7 @@ class HomeScreen extends StatelessWidget {
                     icon: const Icon(Icons.refresh, color: Colors.white),
                     tooltip: 'إعادة تعيين قاعدة البيانات',
                   ),
-                ),*/
+                ),
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
@@ -947,6 +947,7 @@ class HomeScreen extends StatelessWidget {
         ),
       );
     } catch (e) {
+      print(e);
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
