@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:ecclesia/screens/church/view_church_screen.dart';
+import 'package:ecclesia/screens/inventory/inventory_main_screen.dart';
 import 'package:ecclesia/screens/settings/settings_page.dart';
 import 'package:ecclesia/utils/app_footer.dart';
 import 'package:flutter/material.dart';
@@ -71,6 +72,7 @@ class MyApp extends StatelessWidget {
       title: 'اكليسيا',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        primaryColor: Colors.white,
         primarySwatch: MaterialColor(0xFF1A2A80, {
           50: AppColors.light,
           100: AppColors.accent,
@@ -129,20 +131,6 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         _buildWelcomeCard(user),
-                        const SizedBox(height: 24),
-                        OutlinedButton.icon(
-                          onPressed: () {},
-                          style: ButtonStyle(
-                            foregroundColor: WidgetStatePropertyAll(
-                              AppColors.primary,
-                            ),
-                          ),
-                          icon: Icon(Icons.inventory, color: AppColors.primary),
-                          label: Text(
-                            "المخزون",
-                            style: TextStyle(color: AppColors.primary),
-                          ),
-                        ),
                         const SizedBox(height: 24),
                         _buildMenuGrid(context, isDesktop),
                       ],
@@ -473,6 +461,13 @@ class HomeScreen extends StatelessWidget {
 
   List<Map<String, dynamic>> _getMenuItemsByRole() {
     final baseItems = [
+      {
+        'title': 'المخزون',
+        'icon': Icons.inventory,
+        'screen': const InventoryMainScreen(),
+        'color': const Color(0xFF2196F3),
+        'description': 'إدارة المخزون',
+      },
       {
         'title': 'الأفراد',
         'icon': Icons.people_rounded,
